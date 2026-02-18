@@ -4,7 +4,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_API_URL=https://rqperformance.com.br/api/v1
+ENV NEXT_PUBLIC_API_URL=https://api.rqperformance.com.br/api/v1
 RUN npm run build
 
 FROM node:20-alpine AS runner
