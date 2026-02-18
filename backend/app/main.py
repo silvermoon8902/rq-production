@@ -1,0 +1,94 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import get_settings
+from app.core.database import engine, Base, AsyncSessionLocal
+from app.modules.auth.routes import router as auth_router
+from app.modules.clients.routes import router as clients_router
+from app.modules.team.routes import router as team_router
+from app.modules.demands.routes import router as demands_router
+from app.modules.financial.routes import router as financial_router
+from app.shared.dashboard import router as dashboard_router
+
+# Import all models so they're registered with Base
+from app.modules.auth.models import User  # noqa
+from app.modules.clients.models import Client  # noqa
+from app.modules.team.models import Squad, TeamMember, TeamAllocation  # noqa
+from app.modules.demands.models import Demand, KanbanColumn, DemandHistory  # noqa
+
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create tables and seed defaults
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Seed default kanban columns
+    from app.modules.demands.services import seed_default_columns
+
+    async with AsyncSessionLocal() as session:
+        await seed_default_columns(session)
+
+    # Seed default admin user
+    from app.modules.auth.models import User, UserRole
+    from app.core.security import get_password_hash
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.role == UserRole.ADMIN)
+        )
+        if not result.scalar_one_or_none():
+            admin = User(
+                email="admin@rqos.com",
+                name="Admin RQ",
+                hashed_password=get_password_hash("admin123"),
+                role=UserRole.ADMIN,
+            )
+            session.add(admin)
+            await session.commit()
+
+    yield
+
+    await engine.dispose()
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="RQ.OS — Sistema Operacional Interno da Agência RQ",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register routers
+API_PREFIX = "/api/v1"
+app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(clients_router, prefix=API_PREFIX)
+app.include_router(team_router, prefix=API_PREFIX)
+app.include_router(demands_router, prefix=API_PREFIX)
+app.include_router(financial_router, prefix=API_PREFIX)
+app.include_router(dashboard_router, prefix=API_PREFIX)
+
+
+@app.get("/")
+async def root():
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running",
+    }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
