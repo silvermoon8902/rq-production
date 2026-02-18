@@ -6,8 +6,8 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'RQ.OS — Sistema Operacional',
-  description: 'Sistema Operacional Interno da Agência RQ',
+  title: 'RQ. Performance — Gestão Operacional',
+  description: 'RQ. Performance — Gestão Operacional da Agência RQ',
 };
 
 export default function RootLayout({

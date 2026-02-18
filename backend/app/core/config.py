@@ -3,7 +3,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "RQ.OS"
+    APP_NAME: str = "RQ. Performance"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 

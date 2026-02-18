@@ -26,18 +26,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-dark-950">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          <img src="/logo.jpeg" alt="RQ" className="h-16 w-16 rounded-xl mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-white">
-            <span className="text-primary-400">RQ</span>.OS
+            <span className="text-primary-300">RQ</span>. Performance
           </h1>
-          <p className="text-gray-400 mt-2">Sistema Operacional da Agência</p>
+          <p className="text-gray-500 mt-2">Gestão Operacional da Agência</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="card space-y-4">
+        <form onSubmit={handleSubmit} className="bg-dark-900 rounded-xl border border-dark-800 p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -49,7 +50,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Senha</label>
             <input
               type="password"
               value={password}
