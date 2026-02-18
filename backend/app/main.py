@@ -60,6 +60,7 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description="RQ. Performance — Gestão Operacional da Agência RQ",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 app.add_middleware(

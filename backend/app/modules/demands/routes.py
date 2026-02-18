@@ -56,7 +56,7 @@ async def get_board(
 
 
 # === Demands ===
-@router.post("/", response_model=schemas.DemandResponse, status_code=201)
+@router.post("", response_model=schemas.DemandResponse, status_code=201)
 async def create_demand(
     data: schemas.DemandCreate,
     db: AsyncSession = Depends(get_db),
@@ -65,7 +65,7 @@ async def create_demand(
     return await services.create_demand(db, data, current_user.id)
 
 
-@router.get("/", response_model=list[schemas.DemandResponse])
+@router.get("", response_model=list[schemas.DemandResponse])
 async def list_demands(
     client_id: int | None = Query(None),
     assigned_to_id: int | None = Query(None),

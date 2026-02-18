@@ -8,7 +8,7 @@ from app.modules.clients import schemas, services
 router = APIRouter(prefix="/clients", tags=["Clientes"])
 
 
-@router.post("/", response_model=schemas.ClientResponse, status_code=201)
+@router.post("", response_model=schemas.ClientResponse, status_code=201)
 async def create_client(
     data: schemas.ClientCreate,
     db: AsyncSession = Depends(get_db),
@@ -17,7 +17,7 @@ async def create_client(
     return await services.create_client(db, data, current_user.id)
 
 
-@router.get("/", response_model=list[schemas.ClientResponse])
+@router.get("", response_model=list[schemas.ClientResponse])
 async def list_clients(
     status: str | None = Query(None),
     segment: str | None = Query(None),
