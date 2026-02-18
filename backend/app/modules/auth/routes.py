@@ -29,6 +29,17 @@ async def refresh_token(data: schemas.RefreshRequest, db: AsyncSession = Depends
     return services.generate_tokens(user)
 
 
+@router.post("/register", response_model=schemas.TokenResponse)
+async def register(data: schemas.RegisterRequest, db: AsyncSession = Depends(get_db)):
+    user_data = schemas.UserCreate(
+        email=data.email,
+        name=data.name,
+        password=data.password,
+    )
+    user = await services.create_user(db, user_data)
+    return services.generate_tokens(user)
+
+
 @router.get("/me", response_model=schemas.UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user

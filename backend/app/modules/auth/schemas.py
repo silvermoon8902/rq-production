@@ -18,6 +18,12 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    name: str
+    password: str
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     name: str

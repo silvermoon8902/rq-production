@@ -57,6 +57,8 @@ export const authApi = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   },
+  register: (data: { email: string; name: string; password: string }) =>
+    api.post('/auth/register', data),
   me: () => api.get('/auth/me'),
   getUsers: () => api.get('/auth/users'),
   createUser: (data: any) => api.post('/auth/users', data),
