@@ -166,9 +166,9 @@ export default function DemandsPage() {
   return (
     <AuthGuard>
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Demandas</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Demandas</h1>
             <p className="text-gray-500 mt-1">
               Kanban com controle de SLA
               {filterType && <span className="ml-2 text-primary-600 font-medium">— {filterType}</span>}
@@ -201,7 +201,7 @@ export default function DemandsPage() {
                 <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700">Limpar filtros</button>
               )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Cliente</label>
                 <select className="input-field text-sm" value={filterClient} onChange={e => setFilterClient(e.target.value)}>
@@ -252,7 +252,7 @@ export default function DemandsPage() {
               return (
                 <div
                   key={column.id}
-                  className="flex-shrink-0 w-80 bg-gray-100 rounded-xl p-4"
+                  className="flex-shrink-0 w-72 sm:w-80 bg-gray-100 rounded-xl p-3 sm:p-4"
                   onDragOver={handleDragOver}
                   onDrop={() => handleDrop(column.id)}
                 >
@@ -362,7 +362,7 @@ export default function DemandsPage() {
               <label className="block text-sm font-medium mb-1">Descrição</label>
               <textarea className="input-field" rows={3} value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Prioridade</label>
                 <select className="input-field" value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}>
@@ -380,7 +380,7 @@ export default function DemandsPage() {
                 </datalist>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Cliente</label>
                 <select className="input-field" value={form.client_id} onChange={e => setForm({...form, client_id: e.target.value})}>
@@ -396,7 +396,7 @@ export default function DemandsPage() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">SLA (horas)</label>
                 <input type="number" className="input-field" value={form.sla_hours} onChange={e => setForm({...form, sla_hours: e.target.value})} placeholder="Ex: 48" />

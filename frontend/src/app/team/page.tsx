@@ -115,20 +115,20 @@ export default function TeamPage() {
   return (
     <AuthGuard>
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Equipe</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Equipe</h1>
             <p className="text-gray-500 mt-1">{members.length} membros em {squads.length} squads</p>
           </div>
           {canEdit && (
-            <div className="flex gap-2">
-              <button onClick={() => setShowAllocModal(true)} className="btn-secondary flex items-center gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setShowAllocModal(true)} className="btn-secondary flex items-center gap-2 text-sm">
                 <Link2 className="h-4 w-4" /> Alocar
               </button>
-              <button onClick={() => setShowSquadModal(true)} className="btn-secondary flex items-center gap-2">
+              <button onClick={() => setShowSquadModal(true)} className="btn-secondary flex items-center gap-2 text-sm">
                 <Users className="h-4 w-4" /> Novo Squad
               </button>
-              <button onClick={() => setShowMemberModal(true)} className="btn-primary flex items-center gap-2">
+              <button onClick={() => setShowMemberModal(true)} className="btn-primary flex items-center gap-2 text-sm">
                 <UserPlus className="h-4 w-4" /> Novo Membro
               </button>
             </div>
@@ -160,16 +160,16 @@ export default function TeamPage() {
 
             {/* Members */}
             <h2 className="text-lg font-semibold mb-4">Membros</h2>
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <table className="w-full">
+            <div className="bg-white rounded-xl border overflow-x-auto">
+              <table className="w-full min-w-[700px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Cargo</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Squad</th>
-                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Clientes Ativos</th>
-                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Taxa de Churn</th>
-                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Novos Clientes</th>
+                    <th className="text-left px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
+                    <th className="text-left px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Cargo</th>
+                    <th className="text-left px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Squad</th>
+                    <th className="text-center px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Clientes Ativos</th>
+                    <th className="text-center px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Taxa de Churn</th>
+                    <th className="text-center px-4 md:px-6 py-3 text-xs font-medium text-gray-500 uppercase">Novos Clientes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -243,7 +243,7 @@ export default function TeamPage() {
                 {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
                 <input type="email" className="input-field" value={memberForm.email} onChange={e => setMemberForm({...memberForm, email: e.target.value})} />
@@ -281,7 +281,7 @@ export default function TeamPage() {
               <label className="block text-sm font-medium mb-1">Valor Mensal (R$) *</label>
               <input type="number" step="0.01" className="input-field" value={allocForm.monthly_value} onChange={e => setAllocForm({...allocForm, monthly_value: e.target.value})} required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Data Início *</label>
                 <input type="date" className="input-field" value={allocForm.start_date} onChange={e => setAllocForm({...allocForm, start_date: e.target.value})} required />

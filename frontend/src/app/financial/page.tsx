@@ -37,16 +37,16 @@ export default function FinancialPage() {
   return (
     <AuthGuard>
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Financeiro</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Financeiro</h1>
             <p className="text-gray-500 mt-1">Custos proporcionais por cliente e colaborador</p>
           </div>
           <div className="flex items-center gap-3">
-            <select className="input-field w-40" value={month} onChange={e => setMonth(Number(e.target.value))}>
+            <select className="input-field w-full sm:w-40" value={month} onChange={e => setMonth(Number(e.target.value))}>
               {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
-            <select className="input-field w-28" value={year} onChange={e => setYear(Number(e.target.value))}>
+            <select className="input-field w-full sm:w-28" value={year} onChange={e => setYear(Number(e.target.value))}>
               {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>

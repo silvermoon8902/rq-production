@@ -71,9 +71,9 @@ export default function ClientsPage() {
   return (
     <AuthGuard>
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Clientes</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Clientes</h1>
             <p className="text-gray-500 mt-1">{clients.length} clientes cadastrados</p>
           </div>
           {canEdit && (
@@ -144,7 +144,7 @@ export default function ClientsPage() {
               <label className="block text-sm font-medium mb-1">Empresa</label>
               <input className="input-field" value={form.company} onChange={e => setForm({...form, company: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
                 <input type="email" className="input-field" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
@@ -154,7 +154,7 @@ export default function ClientsPage() {
                 <input className="input-field" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Segmento</label>
                 <input className="input-field" value={form.segment} onChange={e => setForm({...form, segment: e.target.value})} />

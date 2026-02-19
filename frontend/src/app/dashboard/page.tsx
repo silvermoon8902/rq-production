@@ -112,7 +112,7 @@ export default function DashboardPage() {
     <AuthGuard>
       <div>
         <div className="mb-8">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
           <p className="text-gray-500 mt-1">
             {isColaborador ? `Olá, ${user?.name}` : 'Visão geral da operação'}
           </p>
