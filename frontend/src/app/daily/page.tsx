@@ -17,10 +17,10 @@ const healthColor = (score: number | null) => {
 };
 
 const healthBg = (score: number | null) => {
-  if (score === null) return 'bg-gray-100';
-  if (score >= 8) return 'bg-green-50 border-green-200';
-  if (score >= 5) return 'bg-yellow-50 border-yellow-200';
-  return 'bg-red-50 border-red-200';
+  if (score === null) return 'bg-gray-100 dark:bg-dark-700';
+  if (score >= 8) return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
+  if (score >= 5) return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800';
+  return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
 };
 
 export default function DailyPage() {

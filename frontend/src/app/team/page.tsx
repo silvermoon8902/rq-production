@@ -320,25 +320,25 @@ export default function TeamPage() {
             </div>
 
             {/* Members Table */}
-            <div className="bg-white rounded-xl border overflow-x-auto mb-8">
+            <div className="bg-white dark:bg-dark-800 rounded-xl border dark:border-dark-700 overflow-x-auto mb-8">
               <table className="w-full min-w-[1100px]">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-dark-700">
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Cargo</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Squad</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ativos</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase text-red-400">Perdidos</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Retenção</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Churn</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Criadas</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Concluídas</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase text-red-400">Atrasadas</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">SLA médio</th>
-                    {canEdit && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ações</th>}
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cargo</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Squad</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ativos</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-red-400">Perdidos</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Retenção</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Churn</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Criadas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Concluídas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-red-400">Atrasadas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">SLA médio</th>
+                    {canEdit && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ações</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y dark:divide-dark-700">
                   {filteredMembers.map((member) => {
                     const m = memberMetrics[member.id] || {
                       activeClients: 0, lostClients: 0, retentionRate: 100, churnRate: 0,
@@ -348,19 +348,19 @@ export default function TeamPage() {
                       ? m.avgSlaHours >= 48 ? `${Math.round(m.avgSlaHours / 24)}d` : `${m.avgSlaHours}h`
                       : '—';
                     return (
-                      <tr key={member.id} className="hover:bg-gray-50">
+                      <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                         <td className="px-4 py-4 font-medium">{member.name}</td>
-                        <td className="px-4 py-4 text-sm text-gray-600">{member.role_title}</td>
-                        <td className="px-4 py-4 text-sm text-gray-600">
+                        <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{member.role_title}</td>
+                        <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {squads.find(s => s.id === member.squad_id)?.name || <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className="inline-flex items-center justify-center bg-green-100 text-green-800 text-sm font-semibold rounded-full w-8 h-8">
+                          <span className="inline-flex items-center justify-center bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-sm font-semibold rounded-full w-8 h-8">
                             {m.activeClients}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.lostClients > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'}`}>
+                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.lostClients > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-dark-600 text-gray-400'}`}>
                             {m.lostClients}
                           </span>
                         </td>
@@ -375,21 +375,21 @@ export default function TeamPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-800 text-sm font-semibold rounded-full w-8 h-8">
+                          <span className="inline-flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-sm font-semibold rounded-full w-8 h-8">
                             {m.demandsCreated}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className="inline-flex items-center justify-center bg-emerald-100 text-emerald-800 text-sm font-semibold rounded-full w-8 h-8">
+                          <span className="inline-flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 text-sm font-semibold rounded-full w-8 h-8">
                             {m.demandsCompleted}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.demandsOverdue > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'}`}>
+                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.demandsOverdue > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-dark-600 text-gray-400'}`}>
                             {m.demandsOverdue}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-center text-sm font-medium text-gray-600">
+                        <td className="px-4 py-4 text-center text-sm font-medium text-gray-600 dark:text-gray-400">
                           {slaDisplay}
                         </td>
                         {canEdit && (
@@ -424,25 +424,25 @@ export default function TeamPage() {
               {allocations.filter(a => !a.end_date || new Date(a.end_date) >= new Date()).length === 0 ? (
                 <p className="text-gray-400">Nenhuma alocação ativa</p>
               ) : (
-                <div className="bg-white rounded-xl border overflow-x-auto">
+                <div className="bg-white dark:bg-dark-800 rounded-xl border dark:border-dark-700 overflow-x-auto">
                   <table className="w-full min-w-[600px]">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50 dark:bg-dark-700">
                       <tr>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Membro</th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Início</th>
-                        {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Valor/mês</th>}
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Membro</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cliente</th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Início</th>
+                        {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Valor/mês</th>}
                         {canEdit && <th className="px-4 py-3" />}
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y dark:divide-dark-700">
                       {allocations
                         .filter(a => !a.end_date || new Date(a.end_date) >= new Date())
                         .map(a => (
-                          <tr key={a.id} className="hover:bg-gray-50">
+                          <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                             <td className="px-4 py-3 font-medium text-sm">{a.member_name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{a.client_name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{a.client_name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                               {new Date(a.start_date + 'T12:00:00').toLocaleDateString('pt-BR')}
                             </td>
                             {isAdmin && (

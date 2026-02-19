@@ -309,7 +309,7 @@ export default function DemandsPage() {
               return (
                 <div
                   key={column.id}
-                  className="flex-shrink-0 w-72 sm:w-80 bg-gray-100 rounded-xl p-3 sm:p-4"
+                  className="flex-shrink-0 w-72 sm:w-80 bg-gray-100 dark:bg-dark-800 rounded-xl p-3 sm:p-4"
                   onDragOver={handleDragOver}
                   onDrop={() => handleDrop(column.id)}
                 >
@@ -319,12 +319,12 @@ export default function DemandsPage() {
                       <h3 className="font-semibold text-sm">{column.name}</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
+                      <span className="text-xs text-gray-500 bg-white dark:bg-dark-700 dark:text-gray-400 px-2 py-1 rounded-full">
                         {colDemands.length}
                       </span>
                       <button
                         onClick={() => { setQuickAddColumn(column.id); setQuickAddTitle(''); }}
-                        className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-primary-300 hover:text-dark-900 text-gray-400 transition-colors text-sm font-bold"
+                        className="w-6 h-6 flex items-center justify-center rounded-full bg-white dark:bg-dark-700 hover:bg-primary-300 hover:text-dark-900 text-gray-400 transition-colors text-sm font-bold"
                         title="Adicionar demanda rápida"
                       >
                         +
@@ -335,7 +335,7 @@ export default function DemandsPage() {
                   <div className="space-y-3 min-h-[200px]">
                     {/* Quick add inline */}
                     {quickAddColumn === column.id && (
-                      <div className="bg-white rounded-lg p-3 shadow-sm border-2 border-primary-300">
+                      <div className="bg-white dark:bg-dark-700 rounded-lg p-3 shadow-sm border-2 border-primary-300">
                         <input
                           ref={quickAddRef}
                           type="text"
@@ -350,7 +350,7 @@ export default function DemandsPage() {
                             else { setQuickAddColumn(null); setQuickAddTitle(''); }
                           }}
                           placeholder="Título da demanda..."
-                          className="w-full text-sm border-none outline-none placeholder-gray-400"
+                          className="w-full text-sm border-none outline-none placeholder-gray-400 bg-transparent dark:text-gray-100"
                         />
                         <p className="text-xs text-gray-400 mt-1">Enter para criar · Esc para cancelar</p>
                       </div>
@@ -363,7 +363,7 @@ export default function DemandsPage() {
                           key={demand.id}
                           draggable
                           onDragStart={() => handleDragStart(demand)}
-                          className={`bg-white rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
+                          className={`bg-white dark:bg-dark-700 rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
                         >
                           <div className="flex items-start justify-between mb-1.5 gap-1">
                             <div className="flex items-start gap-1.5 flex-1 min-w-0">
@@ -384,7 +384,7 @@ export default function DemandsPage() {
                             <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
                           )}
                           {demand.demand_type && (
-                            <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mb-2">
+                            <span className="inline-block text-xs bg-gray-100 dark:bg-dark-600 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded mb-2">
                               {demand.demand_type}
                             </span>
                           )}

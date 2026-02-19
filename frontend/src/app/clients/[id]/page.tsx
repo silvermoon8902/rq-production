@@ -488,7 +488,7 @@ export default function ClientDetailPage() {
                         )}
                         <div className="flex flex-wrap gap-3 text-xs text-gray-400">
                           {d.demand_type && (
-                            <span className="bg-gray-100 px-2 py-0.5 rounded">{d.demand_type}</span>
+                            <span className="bg-gray-100 dark:bg-dark-700 px-2 py-0.5 rounded">{d.demand_type}</span>
                           )}
                           {d.assigned_to_name && <span>Resp.: {d.assigned_to_name}</span>}
                           <span>{formatTimeAgo(d.created_at)}</span>

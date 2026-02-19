@@ -347,8 +347,8 @@ export default function ClientsPage() {
             </div>
 
             {isAdmin && (
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Financeiro (Admin)</p>
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600">
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Financeiro (Admin)</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Valor Mensal (R$)</label>
