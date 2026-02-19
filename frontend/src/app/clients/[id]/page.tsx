@@ -7,6 +7,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import { clientsApi, teamApi, demandsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { ClientDetail, TeamMember, Demand } from '@/types';
 import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -36,6 +37,8 @@ export default function ClientDetailPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const canEdit = user?.role === 'admin' || user?.role === 'gerente';
+  const { isHidden } = useFinanceVisibilityStore();
+  const fmtMoney = (v: number) => isHidden ? 'R$ •••••' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   const demandTypes = useMemo(() => {
     const types = new Set(demands.map(d => d.demand_type).filter(Boolean) as string[]);
@@ -232,7 +235,7 @@ export default function ClientDetailPage() {
               <div className="bg-emerald-100 p-2 rounded-lg"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
               <div>
                 <p className="text-xs text-gray-500">Valor Mensal</p>
-                <p className="text-lg font-bold">R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</p>
+                <p className="text-lg font-bold">{isHidden ? 'R$ •••••' : `R$ ${client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}</p>
               </div>
             </div>
           ) : <div />}
@@ -370,7 +373,7 @@ export default function ClientDetailPage() {
                       <div className="flex justify-between">
                         <dt className="text-gray-500">Valor Mensal</dt>
                         <dd className="font-semibold text-emerald-700">
-                          R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {fmtMoney(client.monthly_value)}
                         </dd>
                       </div>
                     ) : null}
@@ -378,7 +381,7 @@ export default function ClientDetailPage() {
                       <div className="flex justify-between">
                         <dt className="text-gray-500">Custo Operacional</dt>
                         <dd className="font-medium text-red-600">
-                          R$ {client.operational_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {fmtMoney(client.operational_cost)}
                         </dd>
                       </div>
                     ) : null}
@@ -386,8 +389,8 @@ export default function ClientDetailPage() {
                       <div className="flex justify-between border-t pt-2">
                         <dt className="text-gray-600 font-medium">Margem</dt>
                         <dd className={`font-semibold ${margin >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                          R$ {margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          {marginPct !== null && (
+                          {isHidden ? 'R$ •••••' : `R$ ${margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          {!isHidden && marginPct !== null && (
                             <span className="text-xs text-gray-400 ml-1">({marginPct}%)</span>
                           )}
                         </dd>
@@ -396,7 +399,7 @@ export default function ClientDetailPage() {
                     {ltv ? (
                       <div className="flex justify-between">
                         <dt className="text-gray-500">LTV estimado</dt>
-                        <dd className="font-semibold">R$ {ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</dd>
+                        <dd className="font-semibold">{fmtMoney(ltv)}</dd>
                       </div>
                     ) : null}
                   </dl>

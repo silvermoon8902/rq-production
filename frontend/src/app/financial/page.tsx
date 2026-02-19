@@ -6,6 +6,7 @@ import { financialApi } from '@/services/api';
 import { FinancialDashboard } from '@/types';
 import { DollarSign, TrendingUp, Users, Building2, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -20,6 +21,7 @@ export default function FinancialPage() {
   const [loading, setLoading] = useState(true);
   const [expandedClient, setExpandedClient] = useState<number | null>(null);
   const [expandedMember, setExpandedMember] = useState<number | null>(null);
+  const { isHidden } = useFinanceVisibilityStore();
 
   useEffect(() => { loadData(); }, [month, year]);
 
@@ -32,7 +34,7 @@ export default function FinancialPage() {
     finally { setLoading(false); }
   };
 
-  const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const fmt = (v: number) => isHidden ? 'R$ •••••' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   return (
     <AuthGuard>

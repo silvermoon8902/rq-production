@@ -5,6 +5,7 @@ import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
 import { teamApi, clientsApi, demandsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { Squad, TeamMember, Allocation, Client, Demand } from '@/types';
 import { Users, UserPlus, Link2, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -43,6 +44,7 @@ export default function TeamPage() {
   const { user } = useAuthStore();
   const canEdit = user?.role === 'admin' || user?.role === 'gerente';
   const isAdmin = user?.role === 'admin';
+  const { isHidden } = useFinanceVisibilityStore();
 
   useEffect(() => { loadData(); }, []);
 
@@ -464,7 +466,7 @@ export default function TeamPage() {
                             </td>
                             {isAdmin && (
                               <td className="px-4 py-3 text-sm font-medium text-emerald-700">
-                                R$ {a.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                {isHidden ? 'R$ •••••' : `R$ ${a.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                               </td>
                             )}
                             {canEdit && (

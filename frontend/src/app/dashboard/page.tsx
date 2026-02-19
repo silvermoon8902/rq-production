@@ -8,6 +8,7 @@ import { clientsApi, teamApi, demandsApi, financialApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Client, Allocation } from '@/types';
 import { Building2, Users, Kanban, DollarSign, AlertTriangle, CheckCircle2, Briefcase } from 'lucide-react';
+import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 
 interface DashboardStats {
   totalClients: number;
@@ -32,6 +33,7 @@ export default function DashboardPage() {
 
   const isAdmin = user?.role === 'admin';
   const isColaborador = user?.role === 'colaborador';
+  const { isHidden } = useFinanceVisibilityStore();
 
   useEffect(() => {
     if (user) loadStats();
@@ -134,7 +136,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-gray-500">{card.label}</p>
                     <p className="text-2xl font-bold">
                       {card.label === 'Custo Mensal'
-                        ? `R$ ${(card.value as number).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        ? (isHidden ? 'R$ •••••' : `R$ ${(card.value as number).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
                         : card.value}
                     </p>
                     {'total' in card && card.total !== undefined && (

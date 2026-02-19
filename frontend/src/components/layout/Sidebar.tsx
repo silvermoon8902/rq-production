@@ -16,10 +16,13 @@ import {
   Moon,
   Bell,
   CalendarCheck,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { demandsApi } from '@/services/api';
 import { useState, useEffect, useRef } from 'react';
 
@@ -36,6 +39,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { isDark, toggle } = useThemeStore();
+  const { isHidden, toggle: toggleFinance } = useFinanceVisibilityStore();
+  const isAdmin = user?.role === 'admin';
   const { lastSeenAt, markAllRead } = useNotificationStore();
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -217,6 +222,15 @@ export default function Sidebar() {
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {isDark ? 'Claro' : 'Escuro'}
             </button>
+            {isAdmin && (
+              <button
+                onClick={toggleFinance}
+                className={`ml-auto flex items-center gap-1.5 text-sm transition-colors ${isHidden ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-primary-300'}`}
+                title={isHidden ? 'Mostrar valores financeiros' : 'Ocultar valores financeiros'}
+              >
+                {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            )}
           </div>
           <button
             onClick={logout}
