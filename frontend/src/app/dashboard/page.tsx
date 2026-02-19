@@ -8,9 +8,8 @@ import { dashboardApi, teamApi, clientsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Client, Allocation } from '@/types';
 import {
-  Building2, Users, Kanban, DollarSign, AlertTriangle,
-  CheckCircle2, Briefcase, Clock, ArrowRight, CalendarDays,
-  Layers, TrendingUp,
+  Building2, Users, DollarSign, AlertTriangle,
+  ArrowRight, CalendarDays, Layers, TrendingUp,
 } from 'lucide-react';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 
@@ -83,7 +82,7 @@ export default function DashboardPage() {
   const { isHidden } = useFinanceVisibilityStore();
 
   const isAdmin = user?.role === 'admin';
-  const isColaborador = user?.role === 'colaborador';
+  const isNonAdmin = !isAdmin;
 
   const fmtMoney = (v: number) =>
     isHidden ? 'R$ •••••' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -97,7 +96,7 @@ export default function DashboardPage() {
       const { data } = await dashboardApi.getStats();
       setStats(data);
 
-      if (isColaborador) {
+      if (isNonAdmin) {
         const [clientsRes, membersRes, allocsRes] = await Promise.all([
           clientsApi.getAll(),
           teamApi.getMembers(),
@@ -122,15 +121,13 @@ export default function DashboardPage() {
     }
   };
 
-  const demandsActive = stats.demands_backlog + stats.demands_todo + stats.demands_in_progress + stats.demands_in_review;
-
   return (
     <AuthGuard>
       <div>
         <div className="mb-6">
           <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
           <p className="text-gray-500 mt-1">
-            {isColaborador ? `Olá, ${user?.name}` : 'Visão geral da operação'}
+            {isNonAdmin ? `Olá, ${user?.name}` : 'Visão geral da operação'}
           </p>
         </div>
 
@@ -230,7 +227,7 @@ export default function DashboardPage() {
             </div>
 
             {/* ── EQUIPE ── */}
-            {!isColaborador && (
+            {!isNonAdmin && (
               <div>
                 <SectionHeader title="Equipe" href="/team" />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -252,7 +249,7 @@ export default function DashboardPage() {
             )}
 
             {/* ── COLABORADOR: Minha Carteira ── */}
-            {isColaborador && myClients.length > 0 && (
+            {isNonAdmin && myClients.length > 0 && (
               <div>
                 <SectionHeader title={`Minha Carteira (${myClients.length})`} href="/clients" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
