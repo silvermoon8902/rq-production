@@ -8,7 +8,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Client, TeamMember, Allocation, Squad } from '@/types';
-import { Plus, Search, Building2, Filter } from 'lucide-react';
+import { Plus, Search, Building2, Filter, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const emptyForm = {
@@ -17,6 +17,8 @@ const emptyForm = {
   start_date: '', end_date: '',
   monthly_value: '', min_contract_months: '', operational_cost: '',
 };
+
+type NewAllocation = { member_id: string; monthly_value: string; start_date: string };
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -34,6 +36,7 @@ export default function ClientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [newAllocations, setNewAllocations] = useState<NewAllocation[]>([]);
   const { user } = useAuthStore();
 
   const isAdmin = user?.role === 'admin';
@@ -89,6 +92,7 @@ export default function ClientsPage() {
   const openCreate = () => {
     setEditingClient(null);
     setForm(emptyForm);
+    setNewAllocations([]);
     setShowModal(true);
   };
 
@@ -129,7 +133,17 @@ export default function ClientsPage() {
         await clientsApi.update(editingClient.id, payload);
         toast.success('Cliente atualizado');
       } else {
-        await clientsApi.create(payload);
+        const { data: newClient } = await clientsApi.create(payload);
+        // Create optional team allocations
+        const filledAllocs = newAllocations.filter(a => a.member_id);
+        for (const a of filledAllocs) {
+          await teamApi.createAllocation({
+            client_id: newClient.id,
+            member_id: Number(a.member_id),
+            monthly_value: Number(a.monthly_value) || 0,
+            start_date: a.start_date || payload.start_date || new Date().toISOString().slice(0, 10),
+          });
+        }
         toast.success('Cliente criado');
       }
       setShowModal(false);
@@ -362,6 +376,82 @@ export default function ClientsPage() {
                     <label className="block text-sm font-medium mb-1">Custo Operacional (R$)</label>
                     <input type="number" step="0.01" className="input-field" value={form.operational_cost} onChange={e => setForm({...form, operational_cost: e.target.value})} placeholder="0,00" />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {!editingClient && (
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Equipe (opcional)</p>
+                  <button
+                    type="button"
+                    onClick={() => setNewAllocations([...newAllocations, { member_id: '', monthly_value: '', start_date: form.start_date }])}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                  >
+                    <Plus className="h-3 w-3" /> Adicionar membro
+                  </button>
+                </div>
+                {newAllocations.length === 0 && (
+                  <p className="text-xs text-gray-400">Nenhum membro alocado. Clique em "Adicionar membro" para incluir.</p>
+                )}
+                <div className="space-y-2">
+                  {newAllocations.map((alloc, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                      <div>
+                        {idx === 0 && <label className="block text-xs text-gray-500 mb-1">Membro</label>}
+                        <select
+                          className="input-field text-sm"
+                          value={alloc.member_id}
+                          onChange={e => {
+                            const updated = [...newAllocations];
+                            updated[idx] = { ...updated[idx], member_id: e.target.value };
+                            setNewAllocations(updated);
+                          }}
+                        >
+                          <option value="">Selecionar...</option>
+                          {members.filter(m => m.status === 'active').map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        {idx === 0 && <label className="block text-xs text-gray-500 mb-1">Valor/mês (R$)</label>}
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-field text-sm"
+                          placeholder="0,00"
+                          value={alloc.monthly_value}
+                          onChange={e => {
+                            const updated = [...newAllocations];
+                            updated[idx] = { ...updated[idx], monthly_value: e.target.value };
+                            setNewAllocations(updated);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        {idx === 0 && <label className="block text-xs text-gray-500 mb-1">Início</label>}
+                        <input
+                          type="date"
+                          className="input-field text-sm"
+                          value={alloc.start_date}
+                          onChange={e => {
+                            const updated = [...newAllocations];
+                            updated[idx] = { ...updated[idx], start_date: e.target.value };
+                            setNewAllocations(updated);
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewAllocations(newAllocations.filter((_, i) => i !== idx))}
+                        className={`text-red-400 hover:text-red-600 ${idx === 0 ? 'mt-5' : ''}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
