@@ -1,19 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
-import StatusBadge from '@/components/ui/StatusBadge';
 import { teamApi, clientsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Squad, TeamMember, Allocation, Client } from '@/types';
 import { Plus, Users, UserPlus, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+interface MemberMetrics {
+  activeClients: number;
+  churnRate: number;
+  newClients: number;
+}
+
 export default function TeamPage() {
   const [squads, setSquads] = useState<Squad[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSquadModal, setShowSquadModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -27,15 +33,40 @@ export default function TeamPage() {
 
   const loadData = async () => {
     try {
-      const [squadsRes, membersRes, clientsRes] = await Promise.all([
-        teamApi.getSquads(), teamApi.getMembers(), clientsApi.getAll(),
+      const [squadsRes, membersRes, clientsRes, allocsRes] = await Promise.all([
+        teamApi.getSquads(), teamApi.getMembers(), clientsApi.getAll(), teamApi.getAllocations(),
       ]);
       setSquads(squadsRes.data);
       setMembers(membersRes.data);
       setClients(clientsRes.data);
+      setAllocations(allocsRes.data);
     } catch { toast.error('Erro ao carregar dados'); }
     finally { setLoading(false); }
   };
+
+  const memberMetrics = useMemo(() => {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const map: Record<number, MemberMetrics> = {};
+
+    for (const member of members) {
+      const memberAllocs = allocations.filter(a => a.member_id === member.id);
+      const memberClientIds = Array.from(new Set(memberAllocs.map(a => a.client_id)));
+      const memberClients = clients.filter(c => memberClientIds.includes(c.id));
+
+      const activeAllocs = memberAllocs.filter(a => !a.end_date || new Date(a.end_date) >= now);
+      const activeClientIds = Array.from(new Set(activeAllocs.map(a => a.client_id)));
+      const activeClients = clients.filter(c => activeClientIds.includes(c.id) && c.status === 'active').length;
+
+      const churnedClients = memberClients.filter(c => c.status === 'churned').length;
+      const churnRate = memberClients.length > 0 ? Math.round((churnedClients / memberClients.length) * 100) : 0;
+
+      const newClients = memberAllocs.filter(a => new Date(a.created_at) >= firstOfMonth).length;
+
+      map[member.id] = { activeClients, churnRate, newClients };
+    }
+    return map;
+  }, [members, allocations, clients]);
 
   const handleCreateSquad = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,22 +167,39 @@ export default function TeamPage() {
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Cargo</th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Squad</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Contato</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Clientes Ativos</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Taxa de Churn</th>
+                    <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">Novos Clientes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {members.map((member) => (
-                    <tr key={member.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium">{member.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{member.role_title}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {squads.find(s => s.id === member.squad_id)?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4"><StatusBadge status={member.status} /></td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{member.email || '-'}</td>
-                    </tr>
-                  ))}
+                  {members.map((member) => {
+                    const metrics = memberMetrics[member.id] || { activeClients: 0, churnRate: 0, newClients: 0 };
+                    return (
+                      <tr key={member.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium">{member.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{member.role_title}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {squads.find(s => s.id === member.squad_id)?.name || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center justify-center bg-green-100 text-green-800 text-sm font-semibold rounded-full w-8 h-8">
+                            {metrics.activeClients}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`text-sm font-semibold ${metrics.churnRate > 20 ? 'text-red-600' : metrics.churnRate > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                            {metrics.churnRate}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-800 text-sm font-semibold rounded-full w-8 h-8">
+                            {metrics.newClients}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {members.length === 0 && <p className="text-gray-400 text-center py-8">Nenhum membro cadastrado</p>}
