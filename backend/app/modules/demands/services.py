@@ -246,12 +246,18 @@ async def delete_demand(db: AsyncSession, demand_id: int) -> None:
     await db.commit()
 
 
-async def get_kanban_board(db: AsyncSession, client_id: int | None = None) -> dict:
+async def get_kanban_board(
+    db: AsyncSession,
+    client_id: int | None = None,
+    assigned_to_id: int | None = None,
+) -> dict:
     columns = await get_all_columns(db)
 
     query = select(Demand).order_by(Demand.position)
     if client_id:
         query = query.where(Demand.client_id == client_id)
+    if assigned_to_id:
+        query = query.where(Demand.assigned_to_id == assigned_to_id)
     result = await db.execute(query)
     demands = result.scalars().all()
 

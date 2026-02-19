@@ -1,11 +1,30 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.modules.auth.models import User
 from app.modules.demands import schemas, services
+from app.modules.team.models import TeamMember
 
 router = APIRouter(prefix="/demands", tags=["Demandas"])
+
+
+async def _get_member_id_for_colaborador(db: AsyncSession, user: User) -> int | None:
+    """For colaborador role, find their team member ID by user_id or email."""
+    if user.role != "colaborador":
+        return None
+    result = await db.execute(
+        select(TeamMember).where(TeamMember.user_id == user.id)
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        # Try matching by email as fallback
+        result2 = await db.execute(
+            select(TeamMember).where(TeamMember.email == user.email)
+        )
+        member = result2.scalar_one_or_none()
+    return member.id if member else None
 
 
 # === Kanban Columns ===
@@ -52,7 +71,9 @@ async def get_board(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await services.get_kanban_board(db, client_id)
+    # Colaborador only sees their own demands on the board
+    member_id = await _get_member_id_for_colaborador(db, current_user)
+    return await services.get_kanban_board(db, client_id, assigned_to_id=member_id)
 
 
 # === Demands ===
@@ -74,6 +95,11 @@ async def list_demands(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Colaborador only sees their own demands
+    if current_user.role == "colaborador" and assigned_to_id is None:
+        member_id = await _get_member_id_for_colaborador(db, current_user)
+        if member_id:
+            assigned_to_id = member_id
     return await services.get_all_demands(db, client_id, assigned_to_id, status, priority)
 
 

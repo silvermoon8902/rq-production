@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from app.modules.clients.models import Client, ClientStatus
 from app.modules.clients.schemas import ClientCreate, ClientUpdate
-from app.modules.demands.models import Demand, DemandStatus
+from app.modules.demands.models import Demand, DemandStatus, DemandPriority, KanbanColumn
 from app.modules.team.models import TeamAllocation, TeamMember
 
 
@@ -107,14 +107,62 @@ async def get_client_detail(db: AsyncSession, client_id: int) -> dict:
     }
 
 
+async def _create_encerramento_demands(
+    db: AsyncSession, client: Client
+) -> None:
+    """Create ENCERRAMENTO DO CONTRATO demands for all active allocations."""
+    # Avoid duplicates: skip if already exists
+    existing = await db.execute(
+        select(func.count(Demand.id)).where(
+            Demand.client_id == client.id,
+            Demand.title.ilike("ENCERRAMENTO DO CONTRATO%"),
+        )
+    )
+    if (existing.scalar() or 0) > 0:
+        return
+
+    # Get default column ("A Fazer" or first available)
+    col_result = await db.execute(
+        select(KanbanColumn).order_by(KanbanColumn.order).limit(2)
+    )
+    cols = col_result.scalars().all()
+    col = next((c for c in cols if "fazer" in c.name.lower()), cols[0] if cols else None)
+
+    # Get active allocations
+    today = date.today()
+    alloc_result = await db.execute(
+        select(TeamAllocation).where(
+            TeamAllocation.client_id == client.id,
+            or_(TeamAllocation.end_date.is_(None), TeamAllocation.end_date >= today),
+        )
+    )
+    allocs = alloc_result.scalars().all()
+
+    for alloc in allocs:
+        demand = Demand(
+            title=f"ENCERRAMENTO DO CONTRATO - {client.name}",
+            priority=DemandPriority.URGENT,
+            status=DemandStatus.TODO,
+            client_id=client.id,
+            assigned_to_id=alloc.member_id,
+            column_id=col.id if col else None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(demand)
+    await db.commit()
+
+
 async def update_client(
     db: AsyncSession, client_id: int, data: ClientUpdate
 ) -> Client:
     client = await get_client_by_id(db, client_id)
     update_data = data.model_dump(exclude_unset=True)
 
+    end_date_set = "end_date" in update_data and update_data["end_date"]
+
     # Auto-status logic: when end_date is set, status becomes CHURNED (notice period)
-    if "end_date" in update_data and update_data["end_date"]:
+    if end_date_set:
         today = date.today()
         if "status" not in update_data:
             if update_data["end_date"] >= today:
@@ -126,6 +174,11 @@ async def update_client(
         setattr(client, field, value)
     await db.commit()
     await db.refresh(client)
+
+    # Auto-create encerramento demands after commit (so client.name is updated)
+    if end_date_set:
+        await _create_encerramento_demands(db, client)
+
     return client
 
 

@@ -38,6 +38,7 @@ export default function TeamPage() {
   // Filters
   const [filterSquad, setFilterSquad] = useState('');
   const [filterRole, setFilterRole] = useState('');
+  const [periodDays, setPeriodDays] = useState('30');
 
   const { user } = useAuthStore();
   const canEdit = user?.role === 'admin' || user?.role === 'gerente';
@@ -75,11 +76,13 @@ export default function TeamPage() {
 
   const memberMetrics = useMemo(() => {
     const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodMs = Number(periodDays) * 24 * 3600000;
+    const periodStart = new Date(now.getTime() - periodMs);
+
     const map: Record<number, {
-      activeClients: number; lostClients: number; retentionRate: number;
+      activeClients: number; lostClients: number; retentionRate: number; churnRate: number;
       newClients: number; demandsCreated: number; demandsCompleted: number;
-      demandsOverdue: number;
+      demandsOverdue: number; avgSlaHours: number;
     }> = {};
 
     for (const member of members) {
@@ -94,18 +97,30 @@ export default function TeamPage() {
       const lostClients = allMemberClients.filter(c => c.status === 'churned' || c.status === 'inactive').length;
       const total = allMemberClients.length;
       const retentionRate = total > 0 ? Math.round(((total - lostClients) / total) * 100) : 100;
+      const churnRate = 100 - retentionRate;
 
-      const newClients = memberAllocs.filter(a => new Date(a.start_date) >= firstOfMonth).length;
+      const newClients = memberAllocs.filter(a => new Date(a.start_date) >= periodStart).length;
 
       const memberDemands = demands.filter(d => d.assigned_to_id === member.id);
-      const demandsCreated = memberDemands.filter(d => new Date(d.created_at) >= firstOfMonth).length;
-      const demandsCompleted = memberDemands.filter(d => d.status === 'done').length;
+      const demandsCreated = memberDemands.filter(d => new Date(d.created_at) >= periodStart).length;
+
+      const completedInPeriod = memberDemands.filter(d =>
+        d.status === 'done' && d.completed_at && new Date(d.completed_at) >= periodStart
+      );
+      const demandsCompleted = completedInPeriod.length;
       const demandsOverdue = memberDemands.filter(d => d.sla_status === 'overdue').length;
 
-      map[member.id] = { activeClients, lostClients, retentionRate, newClients, demandsCreated, demandsCompleted, demandsOverdue };
+      const avgSlaHours = completedInPeriod.length > 0
+        ? Math.round(completedInPeriod.reduce((sum, d) => {
+            const ms = new Date(d.completed_at!).getTime() - new Date(d.created_at).getTime();
+            return sum + ms / 3600000;
+          }, 0) / completedInPeriod.length)
+        : 0;
+
+      map[member.id] = { activeClients, lostClients, retentionRate, churnRate, newClients, demandsCreated, demandsCompleted, demandsOverdue, avgSlaHours };
     }
     return map;
-  }, [members, allocations, clients, demands]);
+  }, [members, allocations, clients, demands, periodDays]);
 
   // Squad handlers
   const openCreateSquad = () => {
@@ -281,6 +296,13 @@ export default function TeamPage() {
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-lg font-semibold">Membros</h2>
               <div className="flex flex-wrap gap-2 ml-auto">
+                <select className="input-field text-sm py-1.5 w-auto" value={periodDays} onChange={e => setPeriodDays(e.target.value)}>
+                  <option value="30">Últimos 30 dias</option>
+                  <option value="90">Últimos 90 dias</option>
+                  <option value="180">Últimos 6 meses</option>
+                  <option value="365">Último ano</option>
+                  <option value="3650">Todo período</option>
+                </select>
                 <select className="input-field text-sm py-1.5 w-auto" value={filterSquad} onChange={e => setFilterSquad(e.target.value)}>
                   <option value="">Todos os squads</option>
                   {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -299,26 +321,32 @@ export default function TeamPage() {
 
             {/* Members Table */}
             <div className="bg-white rounded-xl border overflow-x-auto mb-8">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1100px]">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Cargo</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Squad</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Clientes</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Perdidos</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ativos</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase text-red-400">Perdidos</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Retenção</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Demandas</th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Atrasadas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Churn</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Criadas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Concluídas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase text-red-400">Atrasadas</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">SLA médio</th>
                     {canEdit && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredMembers.map((member) => {
                     const m = memberMetrics[member.id] || {
-                      activeClients: 0, lostClients: 0, retentionRate: 100,
-                      newClients: 0, demandsCreated: 0, demandsCompleted: 0, demandsOverdue: 0,
+                      activeClients: 0, lostClients: 0, retentionRate: 100, churnRate: 0,
+                      newClients: 0, demandsCreated: 0, demandsCompleted: 0, demandsOverdue: 0, avgSlaHours: 0,
                     };
+                    const slaDisplay = m.avgSlaHours > 0
+                      ? m.avgSlaHours >= 48 ? `${Math.round(m.avgSlaHours / 24)}d` : `${m.avgSlaHours}h`
+                      : '—';
                     return (
                       <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-4 py-4 font-medium">{member.name}</td>
@@ -332,7 +360,7 @@ export default function TeamPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.lostClients > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
+                          <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.lostClients > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'}`}>
                             {m.lostClients}
                           </span>
                         </td>
@@ -342,7 +370,17 @@ export default function TeamPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
+                          <span className={`text-sm font-semibold ${m.churnRate > 20 ? 'text-red-600' : m.churnRate > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                            {m.churnRate}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
                           <span className="inline-flex items-center justify-center bg-blue-100 text-blue-800 text-sm font-semibold rounded-full w-8 h-8">
+                            {m.demandsCreated}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className="inline-flex items-center justify-center bg-emerald-100 text-emerald-800 text-sm font-semibold rounded-full w-8 h-8">
                             {m.demandsCompleted}
                           </span>
                         </td>
@@ -350,6 +388,9 @@ export default function TeamPage() {
                           <span className={`inline-flex items-center justify-center text-sm font-semibold rounded-full w-8 h-8 ${m.demandsOverdue > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'}`}>
                             {m.demandsOverdue}
                           </span>
+                        </td>
+                        <td className="px-4 py-4 text-center text-sm font-medium text-gray-600">
+                          {slaDisplay}
                         </td>
                         {canEdit && (
                           <td className="px-4 py-4 text-center">

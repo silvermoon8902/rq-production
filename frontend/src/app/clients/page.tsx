@@ -5,9 +5,9 @@ import Link from 'next/link';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { clientsApi } from '@/services/api';
+import { clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Client } from '@/types';
+import { Client, TeamMember, Allocation } from '@/types';
 import { Plus, Search, Building2, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,10 +21,13 @@ const emptyForm = {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [niches, setNiches] = useState<string[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterNiche, setFilterNiche] = useState('');
+  const [filterMember, setFilterMember] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -38,29 +41,40 @@ export default function ClientsPage() {
 
   const loadAll = async () => {
     try {
-      const [clientsRes, nichesRes] = await Promise.all([
+      const [clientsRes, nichesRes, membersRes, allocsRes] = await Promise.all([
         clientsApi.getAll(),
         clientsApi.getNiches(),
+        teamApi.getMembers(),
+        teamApi.getAllocations(),
       ]);
       setClients(clientsRes.data);
       setNiches(nichesRes.data);
+      setMembers(membersRes.data);
+      setAllocations(allocsRes.data);
     } catch { toast.error('Erro ao carregar clientes'); }
     finally { setLoading(false); }
   };
 
-  const filtered = useMemo(() => clients.filter(c => {
-    const q = search.toLowerCase();
-    const matchSearch = !search ||
-      c.name.toLowerCase().includes(q) ||
-      (c.company?.toLowerCase().includes(q)) ||
-      (c.cnpj?.includes(search)) ||
-      (c.responsible_name?.toLowerCase().includes(q));
-    const matchStatus = !filterStatus || c.status === filterStatus;
-    const matchNiche = !filterNiche || c.segment === filterNiche;
-    return matchSearch && matchStatus && matchNiche;
-  }), [clients, search, filterStatus, filterNiche]);
+  const filtered = useMemo(() => {
+    const now = new Date();
+    return clients.filter(c => {
+      const q = search.toLowerCase();
+      const matchSearch = !search ||
+        c.name.toLowerCase().includes(q) ||
+        (c.company?.toLowerCase().includes(q)) ||
+        (c.cnpj?.includes(search)) ||
+        (c.responsible_name?.toLowerCase().includes(q));
+      const matchStatus = !filterStatus || c.status === filterStatus;
+      const matchNiche = !filterNiche || c.segment === filterNiche;
+      const matchMember = !filterMember || allocations.some(
+        a => a.client_id === c.id && a.member_id === Number(filterMember) &&
+          (!a.end_date || new Date(a.end_date) >= now)
+      );
+      return matchSearch && matchStatus && matchNiche && matchMember;
+    });
+  }, [clients, search, filterStatus, filterNiche, filterMember, allocations]);
 
-  const activeFilters = [filterStatus, filterNiche].filter(Boolean).length;
+  const activeFilters = [filterStatus, filterNiche, filterMember].filter(Boolean).length;
 
   const openCreate = () => {
     setEditingClient(null);
@@ -152,7 +166,7 @@ export default function ClientsPage() {
           </div>
           {showFilters && (
             <div className="card p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Status</label>
                   <select className="input-field text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -170,9 +184,19 @@ export default function ClientsPage() {
                     {niches.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Colaborador</label>
+                  <select className="input-field text-sm" value={filterMember} onChange={e => setFilterMember(e.target.value)}>
+                    <option value="">Todos</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>)}
+                  </select>
+                </div>
               </div>
               {activeFilters > 0 && (
-                <button onClick={() => { setFilterStatus(''); setFilterNiche(''); }} className="mt-2 text-xs text-red-500 hover:text-red-700">
+                <button
+                  onClick={() => { setFilterStatus(''); setFilterNiche(''); setFilterMember(''); }}
+                  className="mt-2 text-xs text-red-500 hover:text-red-700"
+                >
                   Limpar filtros
                 </button>
               )}
@@ -242,8 +266,8 @@ export default function ClientsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">CNPJ</label>
-                <input className="input-field" value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} placeholder="00.000.000/0001-00" />
+                <label className="block text-sm font-medium mb-1">CNPJ *</label>
+                <input className="input-field" value={form.cnpj} onChange={e => setForm({...form, cnpj: e.target.value})} placeholder="00.000.000/0001-00" required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Status</label>
@@ -258,12 +282,12 @@ export default function ClientsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Responsavel</label>
-                <input className="input-field" value={form.responsible_name} onChange={e => setForm({...form, responsible_name: e.target.value})} />
+                <label className="block text-sm font-medium mb-1">Responsavel *</label>
+                <input className="input-field" value={form.responsible_name} onChange={e => setForm({...form, responsible_name: e.target.value})} required />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Celular do Responsavel</label>
-                <input className="input-field" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="(11) 99999-9999" />
+                <label className="block text-sm font-medium mb-1">Celular do Responsavel *</label>
+                <input className="input-field" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="(11) 99999-9999" required />
               </div>
             </div>
 
@@ -295,13 +319,13 @@ export default function ClientsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Data de Inicio</label>
-                <input type="date" className="input-field" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} />
+                <label className="block text-sm font-medium mb-1">Data de Inicio *</label>
+                <input type="date" className="input-field" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} required />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Data Final</label>
                 <input type="date" className="input-field" value={form.end_date} onChange={e => setForm({...form, end_date: e.target.value})} />
-                {form.end_date && <p className="text-xs text-amber-600 mt-1">Status sera alterado para Churned</p>}
+                {form.end_date && <p className="text-xs text-amber-600 mt-1">Status sera alterado para Churned e sera criada demanda de encerramento</p>}
               </div>
             </div>
 
