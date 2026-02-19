@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, date, timezone
-from sqlalchemy import String, Text, Enum, DateTime, Date, Integer, ForeignKey, Numeric
+from sqlalchemy import String, Text, Enum, DateTime, Date, Integer, ForeignKey, Numeric, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -41,6 +41,8 @@ class Client(Base):
     monthly_value: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
     min_contract_months: Mapped[int] = mapped_column(Integer, nullable=True)
     operational_cost: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
+    # Health score (0-10)
+    health_score: Mapped[float] = mapped_column(Float, nullable=True)
     # Meta
     created_by_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True

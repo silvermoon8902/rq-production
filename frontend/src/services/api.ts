@@ -108,6 +108,12 @@ export const demandsApi = {
   delete: (id: number) => api.delete(`/demands/${id}`),
 };
 
+// Meetings
+export const meetingsApi = {
+  getAll: (params?: any) => api.get('/meetings', { params }),
+  create: (data: any) => api.post('/meetings', data),
+};
+
 // Financial
 export const financialApi = {
   getDashboard: (params?: any) => api.get('/financial/dashboard', { params }),

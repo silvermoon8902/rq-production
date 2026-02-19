@@ -20,6 +20,7 @@ class ClientCreate(BaseModel):
     monthly_value: float | None = None
     min_contract_months: int | None = None
     operational_cost: float | None = None
+    health_score: float | None = None
 
 
 class ClientUpdate(BaseModel):
@@ -39,6 +40,7 @@ class ClientUpdate(BaseModel):
     monthly_value: float | None = None
     min_contract_months: int | None = None
     operational_cost: float | None = None
+    health_score: float | None = None
 
 
 class ClientResponse(BaseModel):
@@ -59,6 +61,7 @@ class ClientResponse(BaseModel):
     monthly_value: float | None
     min_contract_months: int | None
     operational_cost: float | None
+    health_score: float | None
     created_at: datetime
     updated_at: datetime
 

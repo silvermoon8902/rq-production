@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Bell,
+  CalendarCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Clientes', href: '/clients', icon: Building2 },
   { name: 'Equipe', href: '/team', icon: UserCog },
   { name: 'Demandas', href: '/demands', icon: Kanban },
+  { name: 'Daily / 1:1', href: '/daily', icon: CalendarCheck },
   { name: 'Financeiro', href: '/financial', icon: DollarSign, roles: ['admin'] },
 ];
 

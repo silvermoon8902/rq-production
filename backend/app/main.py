@@ -10,12 +10,14 @@ from app.modules.team.routes import router as team_router
 from app.modules.demands.routes import router as demands_router
 from app.modules.financial.routes import router as financial_router
 from app.shared.dashboard import router as dashboard_router
+from app.modules.meetings.routes import router as meetings_router
 
 # Import all models so they're registered with Base
 from app.modules.auth.models import User  # noqa
 from app.modules.clients.models import Client  # noqa
 from app.modules.team.models import Squad, TeamMember, TeamAllocation  # noqa
 from app.modules.demands.models import Demand, KanbanColumn, DemandHistory  # noqa
+from app.modules.meetings.models import ClientMeeting  # noqa
 
 settings = get_settings()
 
@@ -36,6 +38,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS monthly_value NUMERIC(10,2)",
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS min_contract_months INTEGER",
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS operational_cost NUMERIC(10,2)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS health_score FLOAT",
         ]
         for stmt in migrations:
             await conn.execute(text(stmt))
@@ -94,6 +97,7 @@ app.include_router(team_router, prefix=API_PREFIX)
 app.include_router(demands_router, prefix=API_PREFIX)
 app.include_router(financial_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(meetings_router, prefix=API_PREFIX)
 
 
 @app.get("/")

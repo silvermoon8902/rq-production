@@ -110,6 +110,20 @@ export interface Demand {
   in_progress_hours: number | null;
 }
 
+export interface ClientMeeting {
+  id: number;
+  meeting_type: 'daily' | 'one_a_one';
+  client_id: number;
+  squad_id: number | null;
+  member_id: number | null;
+  health_score: number | null;
+  notes: string | null;
+  created_by_id: number | null;
+  created_at: string;
+  client_name: string | null;
+  member_name: string | null;
+}
+
 export interface FinancialDashboard {
   month: number;
   year: number;
