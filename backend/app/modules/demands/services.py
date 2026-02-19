@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from app.modules.demands.models import (
@@ -266,6 +266,9 @@ async def delete_demand(db: AsyncSession, demand_id: int) -> None:
     demand = result.scalar_one_or_none()
     if not demand:
         raise HTTPException(status_code=404, detail="Demanda não encontrada")
+    # Delete history first to avoid FK NOT NULL violation
+    await db.execute(sa_delete(DemandHistory).where(DemandHistory.demand_id == demand_id))
+    await db.flush()
     await db.delete(demand)
     await db.commit()
 

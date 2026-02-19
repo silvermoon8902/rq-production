@@ -7,7 +7,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { demandsApi, clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { KanbanColumn, Demand, Client, TeamMember, Squad } from '@/types';
-import { Plus, Clock, User, Building2, Filter, Trash2 } from 'lucide-react';
+import { Plus, Clock, User, Building2, Filter, Trash2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const priorityEmojis: Record<string, string> = {
@@ -69,6 +69,11 @@ export default function DemandsPage() {
   const quickAddRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
+    title: '', description: '', priority: 'medium', demand_type: '',
+    client_id: '', assigned_to_id: '', sla_hours: '', due_date: '',
+  });
+  const [editingDemand, setEditingDemand] = useState<Demand | null>(null);
+  const [editForm, setEditForm] = useState({
     title: '', description: '', priority: 'medium', demand_type: '',
     client_id: '', assigned_to_id: '', sla_hours: '', due_date: '',
   });
@@ -208,6 +213,40 @@ export default function DemandsPage() {
       toast.success('Demanda excluída');
       loadBoard();
     } catch { toast.error('Erro ao excluir demanda'); }
+  };
+
+  const openEditDemand = (demand: Demand) => {
+    setEditingDemand(demand);
+    setEditForm({
+      title: demand.title,
+      description: demand.description || '',
+      priority: demand.priority,
+      demand_type: demand.demand_type || '',
+      client_id: demand.client_id?.toString() || '',
+      assigned_to_id: demand.assigned_to_id?.toString() || '',
+      sla_hours: demand.sla_hours?.toString() || '',
+      due_date: demand.due_date ? demand.due_date.slice(0, 16) : '',
+    });
+  };
+
+  const handleEditDemand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDemand) return;
+    try {
+      await demandsApi.update(editingDemand.id, {
+        title: editForm.title,
+        description: editForm.description || null,
+        priority: editForm.priority,
+        demand_type: editForm.demand_type || null,
+        client_id: editForm.client_id ? Number(editForm.client_id) : null,
+        assigned_to_id: editForm.assigned_to_id ? Number(editForm.assigned_to_id) : null,
+        sla_hours: editForm.sla_hours ? Number(editForm.sla_hours) : null,
+        due_date: editForm.due_date || null,
+      });
+      toast.success('Demanda atualizada');
+      setEditingDemand(null);
+      loadBoard();
+    } catch { toast.error('Erro ao atualizar demanda'); }
   };
 
   return (
@@ -370,15 +409,24 @@ export default function DemandsPage() {
                               <span className="text-sm flex-shrink-0 mt-0.5">{priorityEmojis[demand.priority]}</span>
                               <h4 className="text-sm font-medium leading-snug">{demand.title}</h4>
                             </div>
-                            {canEdit && (
+                            <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                               <button
-                                onClick={() => handleDeleteDemand(demand.id, demand.title)}
-                                className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
-                                title="Excluir demanda"
+                                onClick={(e) => { e.stopPropagation(); openEditDemand(demand); }}
+                                className="text-gray-300 hover:text-primary-500 transition-colors"
+                                title="Editar demanda"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Pencil className="h-3.5 w-3.5" />
                               </button>
-                            )}
+                              {canEdit && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteDemand(demand.id, demand.title); }}
+                                  className="text-gray-300 hover:text-red-500 transition-colors"
+                                  title="Excluir demanda"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {demand.description && (
                             <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
@@ -429,6 +477,67 @@ export default function DemandsPage() {
             })}
           </div>
         )}
+
+        <Modal isOpen={!!editingDemand} onClose={() => setEditingDemand(null)} title="Editar Demanda" size="lg">
+          <form onSubmit={handleEditDemand} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Título *</label>
+              <input className="input-field" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Descrição</label>
+              <textarea className="input-field" rows={3} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Prioridade</label>
+                <select className="input-field" value={editForm.priority} onChange={e => setEditForm({...editForm, priority: e.target.value})}>
+                  <option value="low">🟢 Baixa</option>
+                  <option value="medium">🟡 Média</option>
+                  <option value="high">🟠 Alta</option>
+                  <option value="urgent">🚨 Urgente</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tipo / Área</label>
+                <input className="input-field" placeholder="Ex: Design, Tráfego, Copy..." value={editForm.demand_type} onChange={e => setEditForm({...editForm, demand_type: e.target.value})} list="edit-demand-types" />
+                <datalist id="edit-demand-types">
+                  {demandTypes.map(t => <option key={t} value={t} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Cliente</label>
+                <select className="input-field" value={editForm.client_id} onChange={e => setEditForm({...editForm, client_id: e.target.value})}>
+                  <option value="">Sem cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Responsável</label>
+                <select className="input-field" value={editForm.assigned_to_id} onChange={e => setEditForm({...editForm, assigned_to_id: e.target.value})}>
+                  <option value="">Sem responsável</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">SLA (horas)</label>
+                <input type="number" className="input-field" value={editForm.sla_hours} onChange={e => setEditForm({...editForm, sla_hours: e.target.value})} placeholder="Ex: 48" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Prazo</label>
+                <input type="datetime-local" className="input-field" value={editForm.due_date} onChange={e => setEditForm({...editForm, due_date: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setEditingDemand(null)} className="btn-secondary">Cancelar</button>
+              <button type="submit" className="btn-primary">Salvar</button>
+            </div>
+          </form>
+        </Modal>
 
         <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Nova Demanda" size="lg">
           <form onSubmit={handleCreate} className="space-y-4">
