@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from app.modules.clients.models import Client, ClientStatus
 from app.modules.clients.schemas import ClientCreate, ClientUpdate
-from app.modules.demands.models import Demand, DemandStatus, DemandPriority, KanbanColumn
+from app.modules.demands.models import Demand, DemandHistory, DemandStatus, DemandPriority, KanbanColumn
 from app.modules.team.models import TeamAllocation, TeamMember
 
 
@@ -188,7 +188,10 @@ async def delete_client(db: AsyncSession, client_id: int) -> None:
     client = result.scalar_one_or_none()
     if not client:
         raise HTTPException(status_code=404, detail="Cliente nao encontrado")
-    # Delete child records first (FK NO ACTION constraints)
+    # Delete child records in dependency order (FK NO ACTION constraints)
+    # 1. DemandHistory → Demand → Client
+    demand_ids = select(Demand.id).where(Demand.client_id == client_id).scalar_subquery()
+    await db.execute(sa_delete(DemandHistory).where(DemandHistory.demand_id.in_(demand_ids)))
     await db.execute(sa_delete(Demand).where(Demand.client_id == client_id))
     await db.execute(sa_delete(TeamAllocation).where(TeamAllocation.client_id == client_id))
     await db.flush()
