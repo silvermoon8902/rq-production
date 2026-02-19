@@ -18,6 +18,7 @@ from app.modules.clients.models import Client  # noqa
 from app.modules.team.models import Squad, TeamMember, TeamAllocation  # noqa
 from app.modules.demands.models import Demand, KanbanColumn, DemandHistory  # noqa
 from app.modules.meetings.models import ClientMeeting  # noqa
+from app.modules.financial.models import MonthlyFinancials, ExtraExpense  # noqa
 
 settings = get_settings()
 

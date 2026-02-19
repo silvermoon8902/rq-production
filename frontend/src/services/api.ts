@@ -108,6 +108,11 @@ export const demandsApi = {
   delete: (id: number) => api.delete(`/demands/${id}`),
 };
 
+// Dashboard
+export const dashboardApi = {
+  getStats: () => api.get('/dashboard/stats'),
+};
+
 // Meetings
 export const meetingsApi = {
   getAll: (params?: any) => api.get('/meetings', { params }),
@@ -117,6 +122,13 @@ export const meetingsApi = {
 // Financial
 export const financialApi = {
   getDashboard: (params?: any) => api.get('/financial/dashboard', { params }),
+  updateMonthly: (month: number, year: number, data: any) =>
+    api.patch(`/financial/monthly/${month}/${year}`, data),
+  getExtras: (month: number, year: number) =>
+    api.get('/financial/extras', { params: { month, year } }),
+  createExtra: (data: any) => api.post('/financial/extras', data),
+  updateExtra: (id: number, data: any) => api.patch(`/financial/extras/${id}`, data),
+  deleteExtra: (id: number) => api.delete(`/financial/extras/${id}`),
   getClientCosts: (clientId: number, params?: any) =>
     api.get(`/financial/clients/${clientId}`, { params }),
 };

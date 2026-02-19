@@ -125,12 +125,32 @@ export interface ClientMeeting {
   member_name: string | null;
 }
 
+export interface ExtraExpense {
+  id: number;
+  month: number;
+  year: number;
+  description: string;
+  amount: number;
+  payment_date: string | null;
+  notes: string | null;
+  category: string | null;
+}
+
 export interface FinancialDashboard {
   month: number;
   year: number;
-  total_cost: number;
+  total_receivable: number;
+  total_received: number | null;
+  total_operational_cost: number;
+  tax_amount: number | null;
+  marketing_amount: number | null;
+  total_extras: number;
+  net_profit: number | null;
+  extra_expenses: ExtraExpense[];
   by_client: ClientCostSummary[];
   by_member: MemberCostSummary[];
+  by_squad: SquadCostSummary[];
+  by_role: RoleCostSummary[];
 }
 
 export interface ClientCostSummary {
@@ -144,9 +164,23 @@ export interface ClientCostSummary {
 export interface MemberCostSummary {
   member_id: number;
   member_name: string;
+  role_title: string | null;
   total_monthly: number;
   total_proportional: number;
   allocations: AllocationCost[];
+}
+
+export interface SquadCostSummary {
+  squad_id: number | null;
+  squad_name: string;
+  total_monthly: number;
+  total_proportional: number;
+}
+
+export interface RoleCostSummary {
+  role_title: string;
+  total_monthly: number;
+  total_proportional: number;
 }
 
 export interface AllocationCost {
