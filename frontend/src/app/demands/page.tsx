@@ -53,6 +53,7 @@ export default function DemandsPage() {
   const [filterMember, setFilterMember] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('');
 
   // Quick add
   const [quickAddColumn, setQuickAddColumn] = useState<number | null>(null);
@@ -110,6 +111,9 @@ export default function DemandsPage() {
     const roleMemberIds = filterRole
       ? members.filter(m => m.role_title === filterRole).map(m => m.id)
       : null;
+    const periodStart = filterPeriod
+      ? new Date(Date.now() - Number(filterPeriod) * 24 * 3600000)
+      : null;
 
     const filtered: Record<string, Demand[]> = {};
     for (const [colId, colDemands] of Object.entries(allDemands)) {
@@ -119,16 +123,17 @@ export default function DemandsPage() {
         if (filterType && d.demand_type !== filterType) return false;
         if (squadMemberIds && (!d.assigned_to_id || !squadMemberIds.includes(d.assigned_to_id))) return false;
         if (roleMemberIds && (!d.assigned_to_id || !roleMemberIds.includes(d.assigned_to_id))) return false;
+        if (periodStart && new Date(d.created_at) < periodStart) return false;
         return true;
       });
     }
     return filtered;
-  }, [allDemands, filterClient, filterSquad, filterMember, filterRole, filterType, members]);
+  }, [allDemands, filterClient, filterSquad, filterMember, filterRole, filterType, filterPeriod, members]);
 
-  const activeFilterCount = [filterClient, filterSquad, filterMember, filterRole, filterType].filter(Boolean).length;
+  const activeFilterCount = [filterClient, filterSquad, filterMember, filterRole, filterType, filterPeriod].filter(Boolean).length;
 
   const clearFilters = () => {
-    setFilterClient(''); setFilterSquad(''); setFilterMember(''); setFilterRole(''); setFilterType('');
+    setFilterClient(''); setFilterSquad(''); setFilterMember(''); setFilterRole(''); setFilterType(''); setFilterPeriod('');
   };
 
   // Quick add demand
@@ -235,7 +240,7 @@ export default function DemandsPage() {
                 <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700">Limpar filtros</button>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Cliente</label>
                 <select className="input-field text-sm" value={filterClient} onChange={e => setFilterClient(e.target.value)}>
@@ -269,6 +274,16 @@ export default function DemandsPage() {
                 <select className="input-field text-sm" value={filterType} onChange={e => setFilterType(e.target.value)}>
                   <option value="">Todos</option>
                   {demandTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Período</label>
+                <select className="input-field text-sm" value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}>
+                  <option value="">Todos</option>
+                  <option value="7">Últimos 7 dias</option>
+                  <option value="30">Últimos 30 dias</option>
+                  <option value="90">Últimos 90 dias</option>
+                  <option value="365">Último ano</option>
                 </select>
               </div>
             </div>

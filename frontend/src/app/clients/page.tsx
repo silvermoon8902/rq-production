@@ -7,7 +7,7 @@ import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Client, TeamMember, Allocation } from '@/types';
+import { Client, TeamMember, Allocation, Squad } from '@/types';
 import { Plus, Search, Building2, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -23,11 +23,13 @@ export default function ClientsPage() {
   const [niches, setNiches] = useState<string[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [squads, setSquads] = useState<Squad[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterNiche, setFilterNiche] = useState('');
   const [filterMember, setFilterMember] = useState('');
+  const [filterSquad, setFilterSquad] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -41,16 +43,18 @@ export default function ClientsPage() {
 
   const loadAll = async () => {
     try {
-      const [clientsRes, nichesRes, membersRes, allocsRes] = await Promise.all([
+      const [clientsRes, nichesRes, membersRes, allocsRes, squadsRes] = await Promise.all([
         clientsApi.getAll(),
         clientsApi.getNiches(),
         teamApi.getMembers(),
         teamApi.getAllocations(),
+        teamApi.getSquads(),
       ]);
       setClients(clientsRes.data);
       setNiches(nichesRes.data);
       setMembers(membersRes.data);
       setAllocations(allocsRes.data);
+      setSquads(squadsRes.data);
     } catch { toast.error('Erro ao carregar clientes'); }
     finally { setLoading(false); }
   };
@@ -70,11 +74,17 @@ export default function ClientsPage() {
         a => a.client_id === c.id && a.member_id === Number(filterMember) &&
           (!a.end_date || new Date(a.end_date) >= now)
       );
-      return matchSearch && matchStatus && matchNiche && matchMember;
+      const matchSquad = !filterSquad || allocations.some(a => {
+        if (a.client_id !== c.id) return false;
+        if (a.end_date && new Date(a.end_date) < now) return false;
+        const member = members.find(m => m.id === a.member_id);
+        return member?.squad_id === Number(filterSquad);
+      });
+      return matchSearch && matchStatus && matchNiche && matchMember && matchSquad;
     });
-  }, [clients, search, filterStatus, filterNiche, filterMember, allocations]);
+  }, [clients, search, filterStatus, filterNiche, filterMember, filterSquad, allocations, members]);
 
-  const activeFilters = [filterStatus, filterNiche, filterMember].filter(Boolean).length;
+  const activeFilters = [filterStatus, filterNiche, filterMember, filterSquad].filter(Boolean).length;
 
   const openCreate = () => {
     setEditingClient(null);
@@ -166,7 +176,7 @@ export default function ClientsPage() {
           </div>
           {showFilters && (
             <div className="card p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Status</label>
                   <select className="input-field text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -185,6 +195,13 @@ export default function ClientsPage() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs text-gray-500 mb-1">Squad</label>
+                  <select className="input-field text-sm" value={filterSquad} onChange={e => setFilterSquad(e.target.value)}>
+                    <option value="">Todos</option>
+                    {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs text-gray-500 mb-1">Colaborador</label>
                   <select className="input-field text-sm" value={filterMember} onChange={e => setFilterMember(e.target.value)}>
                     <option value="">Todos</option>
@@ -194,7 +211,7 @@ export default function ClientsPage() {
               </div>
               {activeFilters > 0 && (
                 <button
-                  onClick={() => { setFilterStatus(''); setFilterNiche(''); setFilterMember(''); }}
+                  onClick={() => { setFilterStatus(''); setFilterNiche(''); setFilterMember(''); setFilterSquad(''); }}
                   className="mt-2 text-xs text-red-500 hover:text-red-700"
                 >
                   Limpar filtros
