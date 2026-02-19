@@ -8,7 +8,7 @@ import Modal from '@/components/ui/Modal';
 import { clientsApi, teamApi, demandsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { ClientDetail, TeamMember, Demand } from '@/types';
-import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const priorityEmoji: Record<string, string> = {
@@ -201,7 +201,7 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           <div className="card flex items-center gap-3 p-4">
             <div className="bg-blue-100 p-2 rounded-lg"><Kanban className="h-4 w-4 text-blue-600" /></div>
             <div>
@@ -214,6 +214,17 @@ export default function ClientDetailPage() {
             <div>
               <p className="text-xs text-gray-500">Equipe</p>
               <p className="text-lg font-bold">{client.allocations.length}</p>
+            </div>
+          </div>
+          <div className="card flex items-center gap-3 p-4">
+            <div className={`p-2 rounded-lg ${client.health_score === null ? 'bg-gray-100' : client.health_score >= 8 ? 'bg-green-100' : client.health_score >= 5 ? 'bg-yellow-100' : 'bg-red-100'}`}>
+              <Heart className={`h-4 w-4 ${client.health_score === null ? 'text-gray-400' : client.health_score >= 8 ? 'text-green-600' : client.health_score >= 5 ? 'text-yellow-600' : 'text-red-600'}`} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Health Score</p>
+              <p className={`text-lg font-bold ${client.health_score === null ? 'text-gray-400' : client.health_score >= 8 ? 'text-green-600' : client.health_score >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {client.health_score !== null ? client.health_score.toFixed(1) : '—'}
+              </p>
             </div>
           </div>
           {isAdmin && client.monthly_value ? (

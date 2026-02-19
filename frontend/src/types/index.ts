@@ -25,6 +25,7 @@ export interface Client {
   monthly_value: number | null;
   min_contract_months: number | null;
   operational_cost: number | null;
+  health_score: number | null;
   created_at: string;
   updated_at: string;
 }

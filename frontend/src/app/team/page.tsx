@@ -82,7 +82,7 @@ export default function TeamPage() {
     const map: Record<number, {
       activeClients: number; lostClients: number; retentionRate: number; churnRate: number;
       newClients: number; demandsCreated: number; demandsCompleted: number;
-      demandsOverdue: number; avgSlaHours: number;
+      demandsOverdue: number; avgSlaHours: number; avgHealthScore: number | null;
     }> = {};
 
     for (const member of members) {
@@ -117,7 +117,14 @@ export default function TeamPage() {
           }, 0) / completedInPeriod.length)
         : 0;
 
-      map[member.id] = { activeClients, lostClients, retentionRate, churnRate, newClients, demandsCreated, demandsCompleted, demandsOverdue, avgSlaHours };
+      const activeClientsWithScore = clients.filter(
+        c => activeClientIds.includes(c.id) && c.status !== 'churned' && c.status !== 'inactive' && c.health_score !== null
+      );
+      const avgHealthScore = activeClientsWithScore.length > 0
+        ? Math.round(activeClientsWithScore.reduce((sum, c) => sum + (c.health_score ?? 0), 0) / activeClientsWithScore.length * 10) / 10
+        : null;
+
+      map[member.id] = { activeClients, lostClients, retentionRate, churnRate, newClients, demandsCreated, demandsCompleted, demandsOverdue, avgSlaHours, avgHealthScore };
     }
     return map;
   }, [members, allocations, clients, demands, periodDays]);
@@ -335,6 +342,7 @@ export default function TeamPage() {
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Concluídas</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-red-400">Atrasadas</th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">SLA médio</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Health Score</th>
                     {canEdit && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ações</th>}
                   </tr>
                 </thead>
@@ -342,7 +350,7 @@ export default function TeamPage() {
                   {filteredMembers.map((member) => {
                     const m = memberMetrics[member.id] || {
                       activeClients: 0, lostClients: 0, retentionRate: 100, churnRate: 0,
-                      newClients: 0, demandsCreated: 0, demandsCompleted: 0, demandsOverdue: 0, avgSlaHours: 0,
+                      newClients: 0, demandsCreated: 0, demandsCompleted: 0, demandsOverdue: 0, avgSlaHours: 0, avgHealthScore: null,
                     };
                     const slaDisplay = m.avgSlaHours > 0
                       ? m.avgSlaHours >= 48 ? `${Math.round(m.avgSlaHours / 24)}d` : `${m.avgSlaHours}h`
@@ -391,6 +399,15 @@ export default function TeamPage() {
                         </td>
                         <td className="px-4 py-4 text-center text-sm font-medium text-gray-600 dark:text-gray-400">
                           {slaDisplay}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {m.avgHealthScore !== null ? (
+                            <span className={`text-sm font-bold ${m.avgHealthScore >= 8 ? 'text-green-600' : m.avgHealthScore >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {m.avgHealthScore.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
                         </td>
                         {canEdit && (
                           <td className="px-4 py-4 text-center">
