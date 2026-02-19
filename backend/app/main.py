@@ -40,6 +40,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS min_contract_months INTEGER",
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS operational_cost NUMERIC(10,2)",
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS health_score FLOAT",
+            # Enable financial read for non-admins (personal view)
+            "UPDATE module_permissions SET can_read = true WHERE module = 'financial' AND role IN ('gerente', 'colaborador')",
         ]
         for stmt in migrations:
             await conn.execute(text(stmt))

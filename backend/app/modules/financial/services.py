@@ -1,7 +1,7 @@
 import calendar
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from fastapi import HTTPException
 from app.modules.team.models import TeamAllocation, TeamMember, Squad
 from app.modules.clients.models import Client, ClientStatus
@@ -122,14 +122,29 @@ async def delete_extra_expense(db: AsyncSession, expense_id: int) -> None:
 
 
 async def get_financial_dashboard(
-    db: AsyncSession, month: int, year: int
+    db: AsyncSession,
+    month: int,
+    year: int,
+    member_id_filter: int | None = None,
 ) -> dict:
-    result = await db.execute(
+    """
+    Build financial dashboard.
+    member_id_filter=None  → admin view (all data, full P&L)
+    member_id_filter=<id>  → personal view (own allocations only, no company P&L)
+    member_id_filter=-1    → user not linked to a team member (return empty)
+    """
+    is_personal = member_id_filter is not None
+
+    q = (
         select(TeamAllocation, TeamMember, Client, Squad)
         .join(TeamMember, TeamAllocation.member_id == TeamMember.id)
         .join(Client, TeamAllocation.client_id == Client.id)
         .outerjoin(Squad, TeamMember.squad_id == Squad.id)
     )
+    if is_personal:
+        q = q.where(TeamAllocation.member_id == member_id_filter)
+
+    result = await db.execute(q)
     rows = result.all()
 
     by_client: dict[int, dict] = {}
@@ -187,70 +202,103 @@ async def get_financial_dashboard(
         by_member[member.id]["total_proportional"] += calc["proportional_value"]
         by_member[member.id]["allocations"].append(alloc_data)
 
-        squad_key = squad.id if squad else 0
-        squad_name = squad.name if squad else "Sem Squad"
-        if squad_key not in by_squad:
-            by_squad[squad_key] = {
-                "squad_id": squad.id if squad else None,
-                "squad_name": squad_name,
-                "total_monthly": 0.0,
-                "total_proportional": 0.0,
-            }
-        by_squad[squad_key]["total_monthly"] += float(allocation.monthly_value)
-        by_squad[squad_key]["total_proportional"] += calc["proportional_value"]
+        # Squad and role aggregates only for admin view
+        if not is_personal:
+            squad_key = squad.id if squad else 0
+            squad_name = squad.name if squad else "Sem Squad"
+            if squad_key not in by_squad:
+                by_squad[squad_key] = {
+                    "squad_id": squad.id if squad else None,
+                    "squad_name": squad_name,
+                    "total_monthly": 0.0,
+                    "total_proportional": 0.0,
+                }
+            by_squad[squad_key]["total_monthly"] += float(allocation.monthly_value)
+            by_squad[squad_key]["total_proportional"] += calc["proportional_value"]
 
-        role = member.role_title or "Sem Cargo"
-        if role not in by_role:
-            by_role[role] = {
-                "role_title": role,
-                "total_monthly": 0.0,
-                "total_proportional": 0.0,
-            }
-        by_role[role]["total_monthly"] += float(allocation.monthly_value)
-        by_role[role]["total_proportional"] += calc["proportional_value"]
-
-    # A receber: active/onboarding clients' monthly_value
-    active_result = await db.execute(
-        select(Client).where(
-            Client.monthly_value.isnot(None),
-            Client.status.in_([ClientStatus.ACTIVE, ClientStatus.ONBOARDING]),
-        )
-    )
-    active_clients = list(active_result.scalars().all())
-    total_receivable = round(
-        sum(float(c.monthly_value) for c in active_clients if c.monthly_value), 2
-    )
-
-    mf = await get_or_create_monthly_financials(db, month, year)
-    extras = await get_extra_expenses(db, month, year)
-    total_extras = round(sum(float(e.amount) for e in extras), 2)
-
-    net_profit = None
-    if mf.total_received is not None:
-        expenses = round(
-            total_cost + (mf.tax_amount or 0) + (mf.marketing_amount or 0) + total_extras, 2
-        )
-        net_profit = round(mf.total_received - expenses, 2)
+            role = member.role_title or "Sem Cargo"
+            if role not in by_role:
+                by_role[role] = {
+                    "role_title": role,
+                    "total_monthly": 0.0,
+                    "total_proportional": 0.0,
+                }
+            by_role[role]["total_monthly"] += float(allocation.monthly_value)
+            by_role[role]["total_proportional"] += calc["proportional_value"]
 
     def sort_desc(d: dict):
         return sorted(d.values(), key=lambda x: x["total_proportional"], reverse=True)
 
-    return {
-        "month": month,
-        "year": year,
-        "total_receivable": total_receivable,
-        "total_received": mf.total_received,
-        "total_operational_cost": round(total_cost, 2),
-        "tax_amount": mf.tax_amount,
-        "marketing_amount": mf.marketing_amount,
-        "total_extras": total_extras,
-        "net_profit": net_profit,
-        "extra_expenses": extras,
-        "by_client": sort_desc(by_client),
-        "by_member": sort_desc(by_member),
-        "by_squad": sort_desc(by_squad),
-        "by_role": sort_desc(by_role),
-    }
+    if not is_personal:
+        # Admin: full company P&L
+        active_result = await db.execute(
+            select(Client).where(
+                Client.monthly_value.isnot(None),
+                Client.status.in_([ClientStatus.ACTIVE, ClientStatus.ONBOARDING]),
+            )
+        )
+        active_clients = list(active_result.scalars().all())
+        total_receivable = round(
+            sum(float(c.monthly_value) for c in active_clients if c.monthly_value), 2
+        )
+
+        mf = await get_or_create_monthly_financials(db, month, year)
+        extras = await get_extra_expenses(db, month, year)
+        total_extras = round(sum(float(e.amount) for e in extras), 2)
+
+        net_profit = None
+        if mf.total_received is not None:
+            expenses = round(
+                total_cost + (mf.tax_amount or 0) + (mf.marketing_amount or 0) + total_extras, 2
+            )
+            net_profit = round(mf.total_received - expenses, 2)
+
+        return {
+            "month": month,
+            "year": year,
+            "is_personal": False,
+            "total_receivable": total_receivable,
+            "total_received": mf.total_received,
+            "total_operational_cost": round(total_cost, 2),
+            "tax_amount": mf.tax_amount,
+            "marketing_amount": mf.marketing_amount,
+            "total_extras": total_extras,
+            "net_profit": net_profit,
+            "extra_expenses": extras,
+            "by_client": sort_desc(by_client),
+            "by_member": sort_desc(by_member),
+            "by_squad": sort_desc(by_squad),
+            "by_role": sort_desc(by_role),
+        }
+    else:
+        # Personal view: sum of member's currently active allocation monthly values
+        today = date.today()
+        active_alloc_res = await db.execute(
+            select(TeamAllocation).where(
+                TeamAllocation.member_id == member_id_filter,
+                or_(TeamAllocation.end_date.is_(None), TeamAllocation.end_date >= today),
+            )
+        )
+        active_allocs = active_alloc_res.scalars().all()
+        total_receivable = round(sum(float(a.monthly_value) for a in active_allocs), 2)
+
+        return {
+            "month": month,
+            "year": year,
+            "is_personal": True,
+            "total_receivable": total_receivable,
+            "total_received": None,
+            "total_operational_cost": round(total_cost, 2),
+            "tax_amount": None,
+            "marketing_amount": None,
+            "total_extras": 0.0,
+            "net_profit": None,
+            "extra_expenses": [],
+            "by_client": sort_desc(by_client),
+            "by_member": sort_desc(by_member),
+            "by_squad": [],
+            "by_role": [],
+        }
 
 
 async def get_client_costs(

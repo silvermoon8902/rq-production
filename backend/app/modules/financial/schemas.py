@@ -97,6 +97,7 @@ class MonthlyFinancialsResponse(BaseModel):
 class FinancialDashboard(BaseModel):
     month: int
     year: int
+    is_personal: bool = False
     total_receivable: float
     total_received: float | None
     total_operational_cost: float

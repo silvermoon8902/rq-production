@@ -140,6 +140,7 @@ export interface ExtraExpense {
 export interface FinancialDashboard {
   month: number;
   year: number;
+  is_personal: boolean;
   total_receivable: number;
   total_received: number | null;
   total_operational_cost: number;

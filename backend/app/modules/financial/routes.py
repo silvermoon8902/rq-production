@@ -1,9 +1,11 @@
 from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
-from app.core.security import require_role
-from app.modules.auth.models import User
+from app.core.security import require_role, get_current_user
+from app.modules.auth.models import User, UserRole
+from app.modules.team.models import TeamMember
 from app.modules.financial import schemas, services
 
 router = APIRouter(prefix="/financial", tags=["Financeiro"])
@@ -14,12 +16,23 @@ async def financial_dashboard(
     month: int = Query(default=None),
     year: int = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(get_current_user),
 ):
     today = date.today()
     m = month or today.month
     y = year or today.year
-    return await services.get_financial_dashboard(db, m, y)
+
+    member_id_filter: int | None = None
+
+    if current_user.role != UserRole.ADMIN:
+        # Find this user's TeamMember record
+        member_res = await db.execute(
+            select(TeamMember).where(TeamMember.user_id == current_user.id)
+        )
+        member = member_res.scalar_one_or_none()
+        member_id_filter = member.id if member else -1  # -1 = no team member linked
+
+    return await services.get_financial_dashboard(db, m, y, member_id_filter=member_id_filter)
 
 
 @router.patch("/monthly/{month}/{year}", response_model=schemas.MonthlyFinancialsResponse)
