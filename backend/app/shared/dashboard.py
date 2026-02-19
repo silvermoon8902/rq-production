@@ -7,7 +7,7 @@ from app.core.security import get_current_user
 from app.modules.auth.models import User
 from app.modules.clients.models import Client, ClientStatus
 from app.modules.team.models import TeamMember, MemberStatus, Squad
-from app.modules.demands.models import Demand, DemandStatus, SLAStatus
+from app.modules.demands.models import Demand, DemandStatus
 from app.modules.meetings.models import ClientMeeting
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -70,8 +70,9 @@ async def get_stats(
     )
     demands_overdue = await db.execute(
         select(func.count(Demand.id)).where(
-            Demand.sla_status == SLAStatus.OVERDUE,
             Demand.status != DemandStatus.DONE,
+            Demand.due_date.isnot(None),
+            Demand.due_date < now,
         )
     )
 
