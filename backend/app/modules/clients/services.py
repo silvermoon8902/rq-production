@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, delete as sa_delete
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from app.modules.clients.models import Client, ClientStatus
@@ -184,5 +184,9 @@ async def update_client(
 
 async def delete_client(db: AsyncSession, client_id: int) -> None:
     client = await get_client_by_id(db, client_id)
+    # Delete related records first to avoid FK constraint errors
+    await db.execute(sa_delete(Demand).where(Demand.client_id == client_id))
+    await db.execute(sa_delete(TeamAllocation).where(TeamAllocation.client_id == client_id))
+    await db.flush()
     await db.delete(client)
     await db.commit()

@@ -9,7 +9,7 @@ import { clientsApi, teamApi, demandsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { ClientDetail, TeamMember, Demand } from '@/types';
-import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const priorityEmoji: Record<string, string> = {
@@ -31,6 +31,14 @@ export default function ClientDetailPage() {
   const [tab, setTab] = useState<'info' | 'team' | 'demands'>('info');
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [allocForm, setAllocForm] = useState({ member_id: '', monthly_value: '', start_date: '' });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [niches, setNiches] = useState<string[]>([]);
+  const [editForm, setEditForm] = useState({
+    name: '', company: '', cnpj: '', responsible_name: '', phone: '', email: '',
+    segment: '', status: 'active', instagram: '', website: '', notes: '',
+    start_date: '', end_date: '',
+    monthly_value: '', min_contract_months: '', operational_cost: '',
+  });
   const [filterDemandMember, setFilterDemandMember] = useState('');
   const [filterDemandType, setFilterDemandType] = useState('');
   const [filterDemandStatus, setFilterDemandStatus] = useState('');
@@ -61,14 +69,16 @@ export default function ClientDetailPage() {
 
   const loadAll = async () => {
     try {
-      const [clientRes, membersRes, demandsRes] = await Promise.all([
+      const [clientRes, membersRes, demandsRes, nichesRes] = await Promise.all([
         clientsApi.getById(clientId),
         teamApi.getMembers(),
         demandsApi.getAll({ client_id: clientId }),
+        clientsApi.getNiches(),
       ]);
       setClient(clientRes.data);
       setMembers(membersRes.data);
       setDemands(demandsRes.data);
+      setNiches(nichesRes.data);
     } catch {
       toast.error('Erro ao carregar cliente');
       router.push('/clients');
@@ -111,6 +121,48 @@ export default function ClientDetailPage() {
       toast.success('Cliente excluído');
       router.push('/clients');
     } catch { toast.error('Erro ao excluir cliente'); }
+  };
+
+  const openEdit = () => {
+    if (!client) return;
+    setEditForm({
+      name: client.name, company: client.company || '', cnpj: client.cnpj || '',
+      responsible_name: client.responsible_name || '', phone: client.phone || '',
+      email: client.email || '', segment: client.segment || '', status: client.status,
+      instagram: client.instagram || '', website: client.website || '',
+      notes: client.notes || '', start_date: client.start_date || '',
+      end_date: client.end_date || '',
+      monthly_value: client.monthly_value?.toString() || '',
+      min_contract_months: client.min_contract_months?.toString() || '',
+      operational_cost: client.operational_cost?.toString() || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload: any = {
+        name: editForm.name,
+        company: editForm.company || null, cnpj: editForm.cnpj || null,
+        responsible_name: editForm.responsible_name || null, phone: editForm.phone || null,
+        email: editForm.email || null, segment: editForm.segment || null,
+        status: editForm.status, instagram: editForm.instagram || null,
+        website: editForm.website || null, notes: editForm.notes || null,
+        start_date: editForm.start_date || null, end_date: editForm.end_date || null,
+      };
+      if (isAdmin) {
+        payload.monthly_value = editForm.monthly_value ? Number(editForm.monthly_value) : null;
+        payload.min_contract_months = editForm.min_contract_months ? Number(editForm.min_contract_months) : null;
+        payload.operational_cost = editForm.operational_cost ? Number(editForm.operational_cost) : null;
+      }
+      await clientsApi.update(clientId, payload);
+      toast.success('Cliente atualizado');
+      setShowEditModal(false);
+      loadAll();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Erro ao salvar cliente');
+    }
   };
 
   const formatActiveDays = (days: number | null) => {
@@ -179,11 +231,18 @@ export default function ClientDetailPage() {
           <button onClick={() => router.push('/clients')} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm">
             <ArrowLeft className="h-4 w-4" /> Voltar para Clientes
           </button>
-          {isAdmin && (
-            <button onClick={handleDeleteClient} className="flex items-center gap-2 text-red-500 hover:text-red-700 text-sm">
-              <Trash2 className="h-4 w-4" /> Excluir Cliente
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {canEdit && (
+              <button onClick={openEdit} className="flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium">
+                <Pencil className="h-4 w-4" /> Editar
+              </button>
+            )}
+            {isAdmin && (
+              <button onClick={handleDeleteClient} className="flex items-center gap-2 text-red-500 hover:text-red-700 text-sm">
+                <Trash2 className="h-4 w-4" /> Excluir
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Client header */}
@@ -441,7 +500,7 @@ export default function ClientDetailPage() {
                     <div className="flex items-center gap-4">
                       {isAdmin && alloc.monthly_value > 0 && (
                         <span className="text-sm font-medium text-emerald-700">
-                          R$ {alloc.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                          {isHidden ? 'R$ •••••' : `R$ ${alloc.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}/mês
                         </span>
                       )}
                       {canEdit && (
@@ -520,6 +579,109 @@ export default function ClientDetailPage() {
             )}
           </div>
         )}
+
+        {/* Edit Client Modal */}
+        <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Editar Cliente" size="lg">
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nome Fantasia *</label>
+                <input className="input-field" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Razão Social</label>
+                <input className="input-field" value={editForm.company} onChange={e => setEditForm({...editForm, company: e.target.value})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">CNPJ</label>
+                <input className="input-field" value={editForm.cnpj} onChange={e => setEditForm({...editForm, cnpj: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Status</label>
+                <select className="input-field" value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})}>
+                  <option value="active">Ativo</option>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="churned">Churned</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Responsável</label>
+                <input className="input-field" value={editForm.responsible_name} onChange={e => setEditForm({...editForm, responsible_name: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Celular</label>
+                <input className="input-field" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input type="email" className="input-field" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Nicho / Segmento</label>
+                <input className="input-field" value={editForm.segment} onChange={e => setEditForm({...editForm, segment: e.target.value})}
+                  list="edit-niches-list" placeholder="Ex: Odontologia..." />
+                <datalist id="edit-niches-list">
+                  {niches.map(n => <option key={n} value={n} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Instagram</label>
+                <input className="input-field" value={editForm.instagram} onChange={e => setEditForm({...editForm, instagram: e.target.value})} placeholder="@perfil" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Site</label>
+                <input className="input-field" value={editForm.website} onChange={e => setEditForm({...editForm, website: e.target.value})} placeholder="https://..." />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Data Início</label>
+                <input type="date" className="input-field" value={editForm.start_date} onChange={e => setEditForm({...editForm, start_date: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Data Final</label>
+                <input type="date" className="input-field" value={editForm.end_date} onChange={e => setEditForm({...editForm, end_date: e.target.value})} />
+                {editForm.end_date && <p className="text-xs text-amber-600 mt-1">Status será alterado para Churned</p>}
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600">
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">Financeiro (Admin)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Valor Mensal (R$)</label>
+                    <input type="number" step="0.01" className="input-field" value={editForm.monthly_value} onChange={e => setEditForm({...editForm, monthly_value: e.target.value})} placeholder="0,00" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Período Mínimo (meses)</label>
+                    <input type="number" className="input-field" value={editForm.min_contract_months} onChange={e => setEditForm({...editForm, min_contract_months: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Custo Operacional (R$)</label>
+                    <input type="number" step="0.01" className="input-field" value={editForm.operational_cost} onChange={e => setEditForm({...editForm, operational_cost: e.target.value})} placeholder="0,00" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium mb-1">Observações</label>
+              <textarea className="input-field" rows={3} value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowEditModal(false)} className="btn-secondary">Cancelar</button>
+              <button type="submit" className="btn-primary">Salvar</button>
+            </div>
+          </form>
+        </Modal>
 
         {/* Allocate Modal */}
         <Modal isOpen={showAllocModal} onClose={() => setShowAllocModal(false)} title="Alocar Membro">
