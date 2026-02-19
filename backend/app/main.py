@@ -13,7 +13,7 @@ from app.shared.dashboard import router as dashboard_router
 from app.modules.meetings.routes import router as meetings_router
 
 # Import all models so they're registered with Base
-from app.modules.auth.models import User  # noqa
+from app.modules.auth.models import User, ModulePermission  # noqa
 from app.modules.clients.models import Client  # noqa
 from app.modules.team.models import Squad, TeamMember, TeamAllocation, MemberSquad  # noqa
 from app.modules.demands.models import Demand, KanbanColumn, DemandHistory  # noqa
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         await seed_default_columns(session)
 
     # Seed default admin user
-    from app.modules.auth.models import User, UserRole
+    from app.modules.auth.models import User, UserRole, ModulePermission
     from app.core.security import get_password_hash
     from sqlalchemy import select
 
@@ -67,6 +67,41 @@ async def lifespan(app: FastAPI):
                 role=UserRole.ADMIN,
             )
             session.add(admin)
+            await session.commit()
+
+    # Seed default module permissions (skip if already seeded)
+    _DEFAULT_PERMISSIONS = [
+        # (role,          module,      can_read, can_write)
+        ("admin",        "dashboard",  True,  True),
+        ("gerente",      "dashboard",  True,  False),
+        ("colaborador",  "dashboard",  True,  False),
+        ("admin",        "clients",    True,  True),
+        ("gerente",      "clients",    True,  True),
+        ("colaborador",  "clients",    True,  False),
+        ("admin",        "team",       True,  True),
+        ("gerente",      "team",       True,  False),
+        ("colaborador",  "team",       True,  False),
+        ("admin",        "demands",    True,  True),
+        ("gerente",      "demands",    True,  True),
+        ("colaborador",  "demands",    True,  True),
+        ("admin",        "financial",  True,  True),
+        ("gerente",      "financial",  False, False),
+        ("colaborador",  "financial",  False, False),
+        ("admin",        "daily",      True,  True),
+        ("gerente",      "daily",      True,  True),
+        ("colaborador",  "daily",      True,  True),
+        ("admin",        "users",      True,  True),
+        ("gerente",      "users",      False, False),
+        ("colaborador",  "users",      False, False),
+    ]
+    async with AsyncSessionLocal() as session:
+        existing = await session.execute(select(ModulePermission))
+        if not existing.scalars().first():
+            for role, module, can_read, can_write in _DEFAULT_PERMISSIONS:
+                session.add(ModulePermission(
+                    role=role, module=module,
+                    can_read=can_read, can_write=can_write,
+                ))
             await session.commit()
 
     yield

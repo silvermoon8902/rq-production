@@ -3,15 +3,18 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { usePermissionsStore } from '@/stores/permissionsStore';
 import Sidebar from './Sidebar';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading, fetchUser } = useAuthStore();
+  const { fetchPermissions } = usePermissionsStore();
   const router = useRouter();
 
   useEffect(() => {
     fetchUser();
-  }, [fetchUser]);
+    fetchPermissions();
+  }, [fetchUser, fetchPermissions]);
 
   useEffect(() => {
     if (!isLoading && !user) {

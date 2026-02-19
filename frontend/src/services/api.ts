@@ -65,6 +65,13 @@ export const authApi = {
   updateUser: (id: number, data: any) => api.patch(`/auth/users/${id}`, data),
 };
 
+// Permissions
+export const permissionsApi = {
+  getAll: () => api.get('/auth/permissions'),
+  update: (role: string, module: string, data: { can_read: boolean; can_write: boolean }) =>
+    api.put(`/auth/permissions/${role}/${module}`, data),
+};
+
 // Clients
 export const clientsApi = {
   getAll: (params?: any) => api.get('/clients', { params }),

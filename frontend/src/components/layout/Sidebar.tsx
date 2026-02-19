@@ -24,17 +24,18 @@ import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
+import { usePermissionsStore } from '@/stores/permissionsStore';
 import { demandsApi } from '@/services/api';
 import { useState, useEffect, useRef } from 'react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Clientes', href: '/clients', icon: Building2 },
-  { name: 'Equipe', href: '/team', icon: UserCog },
-  { name: 'Demandas', href: '/demands', icon: Kanban },
-  { name: 'Daily / 1:1', href: '/daily', icon: CalendarCheck },
-  { name: 'Financeiro', href: '/financial', icon: DollarSign, roles: ['admin'] },
-  { name: 'Usuários', href: '/users', icon: ShieldCheck, roles: ['admin'] },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { name: 'Clientes', href: '/clients', icon: Building2, module: 'clients' },
+  { name: 'Equipe', href: '/team', icon: UserCog, module: 'team' },
+  { name: 'Demandas', href: '/demands', icon: Kanban, module: 'demands' },
+  { name: 'Daily / 1:1', href: '/daily', icon: CalendarCheck, module: 'daily' },
+  { name: 'Financeiro', href: '/financial', icon: DollarSign, module: 'financial' },
+  { name: 'Usuários', href: '/users', icon: ShieldCheck, module: 'users' },
 ];
 
 export default function Sidebar() {
@@ -42,6 +43,7 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore();
   const { isDark, toggle } = useThemeStore();
   const { isHidden, toggle: toggleFinance } = useFinanceVisibilityStore();
+  const { canRead } = usePermissionsStore();
   const isAdmin = user?.role === 'admin';
   const { lastSeenAt, markAllRead } = useNotificationStore();
   const [open, setOpen] = useState(false);
@@ -184,7 +186,7 @@ export default function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-1">
           {navigation
-            .filter((item) => !item.roles || (user && item.roles.includes(user.role)))
+            .filter((item) => user && canRead(item.module, user.role))
             .map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
