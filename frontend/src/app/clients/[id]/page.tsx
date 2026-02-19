@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AuthGuard from '@/components/layout/AuthGuard';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -30,9 +30,29 @@ export default function ClientDetailPage() {
   const [tab, setTab] = useState<'info' | 'team' | 'demands'>('info');
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [allocForm, setAllocForm] = useState({ member_id: '', monthly_value: '', start_date: '' });
+  const [filterDemandMember, setFilterDemandMember] = useState('');
+  const [filterDemandType, setFilterDemandType] = useState('');
+  const [filterDemandStatus, setFilterDemandStatus] = useState('');
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const canEdit = user?.role === 'admin' || user?.role === 'gerente';
+
+  const demandTypes = useMemo(() => {
+    const types = new Set(demands.map(d => d.demand_type).filter(Boolean) as string[]);
+    return Array.from(types).sort();
+  }, [demands]);
+
+  const filteredDemands = useMemo(() => demands.filter(d => {
+    if (filterDemandMember && d.assigned_to_id !== Number(filterDemandMember)) return false;
+    if (filterDemandType && d.demand_type !== filterDemandType) return false;
+    if (filterDemandStatus && d.sla_status !== filterDemandStatus) return false;
+    return true;
+  }), [demands, filterDemandMember, filterDemandType, filterDemandStatus]);
+
+  const assignedMembers = useMemo(() => {
+    const ids = new Set(demands.map(d => d.assigned_to_id).filter(Boolean));
+    return members.filter(m => ids.has(m.id));
+  }, [demands, members]);
 
   useEffect(() => { loadAll(); }, [clientId]);
 
@@ -430,11 +450,31 @@ export default function ClientDetailPage() {
         {/* Tab: Demandas */}
         {tab === 'demands' && (
           <div>
-            {demands.length === 0 ? (
-              <p className="text-center py-12 text-gray-400">Nenhuma demanda para este cliente</p>
+            {demands.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <select className="input-field text-sm" value={filterDemandMember} onChange={e => setFilterDemandMember(e.target.value)}>
+                  <option value="">Todos colaboradores</option>
+                  {assignedMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <select className="input-field text-sm" value={filterDemandType} onChange={e => setFilterDemandType(e.target.value)}>
+                  <option value="">Todos os tipos</option>
+                  {demandTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select className="input-field text-sm" value={filterDemandStatus} onChange={e => setFilterDemandStatus(e.target.value)}>
+                  <option value="">Todos os status SLA</option>
+                  <option value="on_time">No prazo</option>
+                  <option value="warning">Atenção</option>
+                  <option value="overdue">Atrasado</option>
+                </select>
+              </div>
+            )}
+            {filteredDemands.length === 0 ? (
+              <p className="text-center py-12 text-gray-400">
+                {demands.length === 0 ? 'Nenhuma demanda para este cliente' : 'Nenhuma demanda encontrada'}
+              </p>
             ) : (
               <div className="space-y-3">
-                {demands.map((d) => (
+                {filteredDemands.map((d) => (
                   <div key={d.id} className={`card border-l-4 ${slaColors[d.sla_status] || 'border-l-gray-200'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">

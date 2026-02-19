@@ -77,6 +77,7 @@ class DemandResponse(BaseModel):
     updated_at: datetime
     client_name: str | None = None
     assigned_to_name: str | None = None
+    in_progress_hours: float | None = None
 
     model_config = {"from_attributes": True}
 

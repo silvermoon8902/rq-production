@@ -105,6 +105,28 @@ def _compute_sla_status(demand: Demand) -> str:
     return SLAStatus.ON_TIME.value
 
 
+async def _compute_in_progress_hours(db: AsyncSession, demand_id: int) -> float | None:
+    """Calculate hours from 'Em Progresso' to 'Concluído' using DemandHistory."""
+    result = await db.execute(
+        select(DemandHistory)
+        .where(DemandHistory.demand_id == demand_id)
+        .order_by(DemandHistory.created_at)
+    )
+    history = list(result.scalars().all())
+    prog_time = None
+    for h in history:
+        if h.to_column and "progresso" in h.to_column.lower():
+            prog_time = h.created_at
+        if h.to_column and "conclu" in h.to_column.lower() and prog_time:
+            done_time = h.created_at
+            if done_time.tzinfo is None:
+                done_time = done_time.replace(tzinfo=timezone.utc)
+            if prog_time.tzinfo is None:
+                prog_time = prog_time.replace(tzinfo=timezone.utc)
+            return round((done_time - prog_time).total_seconds() / 3600, 2)
+    return None
+
+
 async def _enrich_demand(db: AsyncSession, demand: Demand) -> dict:
     client_name = None
     assigned_name = None
@@ -116,11 +138,13 @@ async def _enrich_demand(db: AsyncSession, demand: Demand) -> dict:
             select(TeamMember.name).where(TeamMember.id == demand.assigned_to_id)
         )
         assigned_name = r.scalar_one_or_none()
+    in_progress_hours = await _compute_in_progress_hours(db, demand.id)
     return {
         **{c.key: getattr(demand, c.key) for c in Demand.__table__.columns},
         "sla_status": _compute_sla_status(demand),
         "client_name": client_name,
         "assigned_to_name": assigned_name,
+        "in_progress_hours": in_progress_hours,
     }
 
 

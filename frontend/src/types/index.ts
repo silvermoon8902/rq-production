@@ -107,6 +107,7 @@ export interface Demand {
   updated_at: string;
   client_name: string | null;
   assigned_to_name: string | null;
+  in_progress_hours: number | null;
 }
 
 export interface FinancialDashboard {

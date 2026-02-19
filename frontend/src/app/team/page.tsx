@@ -494,7 +494,18 @@ export default function TeamPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Cargo *</label>
-              <input className="input-field" value={memberForm.role_title} onChange={e => setMemberForm({...memberForm, role_title: e.target.value})} required placeholder="Ex: Designer, Gestor de Tráfego..." />
+              <input
+                className="input-field"
+                value={memberForm.role_title}
+                onChange={e => setMemberForm({...memberForm, role_title: e.target.value})}
+                required
+                placeholder="Selecione ou digite novo cargo..."
+                list="role-titles-list"
+              />
+              <datalist id="role-titles-list">
+                {roleTitles.map(r => <option key={r} value={r} />)}
+              </datalist>
+              <p className="text-xs text-gray-400 mt-1">Escolha um cargo existente ou digite para criar novo</p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Squad</label>

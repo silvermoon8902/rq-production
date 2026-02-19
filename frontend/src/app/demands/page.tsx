@@ -24,6 +24,14 @@ const formatTimeAgo = (dateStr: string) => {
   return `${Math.floor(days / 7)}sem atrás`;
 };
 
+const formatInProgressTime = (hours: number) => {
+  if (hours < 1) return `${Math.round(hours * 60)}min`;
+  if (hours < 24) return `${hours.toFixed(1)}h`;
+  const days = Math.floor(hours / 24);
+  const rem = Math.round(hours % 24);
+  return rem > 0 ? `${days}d ${rem}h` : `${days}d`;
+};
+
 const formatDeadline = (dueDateStr: string) => {
   const diff = new Date(dueDateStr).getTime() - Date.now();
   const hours = Math.floor(diff / 3600000);
@@ -404,8 +412,13 @@ export default function DemandsPage() {
                               </span>
                             )}
                           </div>
-                          <div className="mt-1.5">
+                          <div className="mt-1.5 flex items-center justify-between">
                             <StatusBadge status={demand.sla_status} />
+                            {demand.in_progress_hours != null && (
+                              <span className="text-xs text-green-600 font-medium flex items-center gap-1" title="Tempo em progresso até conclusão">
+                                ✓ {formatInProgressTime(demand.in_progress_hours)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
