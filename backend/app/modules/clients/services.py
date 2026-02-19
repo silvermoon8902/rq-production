@@ -183,8 +183,12 @@ async def update_client(
 
 
 async def delete_client(db: AsyncSession, client_id: int) -> None:
-    client = await get_client_by_id(db, client_id)
-    # Delete related records first to avoid FK constraint errors
+    # Load WITHOUT selectinload to avoid SQLAlchemy trying to nullify FK on in-memory objects
+    result = await db.execute(select(Client).where(Client.id == client_id))
+    client = result.scalar_one_or_none()
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado")
+    # Delete child records first (FK NO ACTION constraints)
     await db.execute(sa_delete(Demand).where(Demand.client_id == client_id))
     await db.execute(sa_delete(TeamAllocation).where(TeamAllocation.client_id == client_id))
     await db.flush()
