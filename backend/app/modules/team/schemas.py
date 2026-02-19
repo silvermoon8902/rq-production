@@ -29,6 +29,7 @@ class TeamMemberCreate(BaseModel):
     name: str
     role_title: str
     squad_id: int | None = None
+    squad_ids: list[int] = []      # multi-squad
     user_id: int | None = None
     email: str | None = None
     phone: str | None = None
@@ -39,6 +40,8 @@ class TeamMemberUpdate(BaseModel):
     name: str | None = None
     role_title: str | None = None
     squad_id: int | None = None
+    squad_ids: list[int] | None = None  # multi-squad
+    user_id: int | None = None
     email: str | None = None
     phone: str | None = None
     status: MemberStatus | None = None
@@ -49,6 +52,7 @@ class TeamMemberResponse(BaseModel):
     name: str
     role_title: str
     squad_id: int | None
+    squad_ids: list[int] = []
     user_id: int | None
     email: str | None
     phone: str | None

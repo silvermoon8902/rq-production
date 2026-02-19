@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
-from app.modules.team.models import Squad, TeamMember, TeamAllocation
+from app.modules.team.models import Squad, TeamMember, TeamAllocation, MemberSquad
 from app.modules.team.schemas import (
     SquadCreate, SquadUpdate,
     TeamMemberCreate, TeamMemberUpdate,
@@ -57,27 +57,97 @@ async def delete_squad(db: AsyncSession, squad_id: int) -> None:
     await db.commit()
 
 
+# === Team Member helpers ===
+async def _get_squad_ids_for_member(db: AsyncSession, member_id: int) -> list[int]:
+    result = await db.execute(
+        select(MemberSquad.squad_id).where(MemberSquad.member_id == member_id)
+    )
+    return [row[0] for row in result.all()]
+
+
+async def _save_squad_assignments(
+    db: AsyncSession, member_id: int, squad_ids: list[int]
+) -> None:
+    """Replace all squad assignments for a member."""
+    await db.execute(sa_delete(MemberSquad).where(MemberSquad.member_id == member_id))
+    for squad_id in squad_ids:
+        db.add(MemberSquad(member_id=member_id, squad_id=squad_id))
+    await db.flush()
+
+
+def _member_to_dict(member: TeamMember, squad_ids: list[int]) -> dict:
+    d = {c.key: getattr(member, c.key) for c in TeamMember.__table__.columns}
+    d["squad_ids"] = squad_ids
+    return d
+
+
 # === Team Member ===
-async def create_member(db: AsyncSession, data: TeamMemberCreate) -> TeamMember:
-    member = TeamMember(**data.model_dump())
+async def create_member(db: AsyncSession, data: TeamMemberCreate) -> dict:
+    squad_ids = data.squad_ids or []
+    # Set primary squad_id to first selected squad
+    primary_squad = squad_ids[0] if squad_ids else data.squad_id
+    payload = data.model_dump(exclude={"squad_ids"})
+    payload["squad_id"] = primary_squad
+    member = TeamMember(**payload)
     db.add(member)
+    await db.flush()
+    # Use squad_ids if provided, else fall back to squad_id
+    effective_ids = squad_ids if squad_ids else ([primary_squad] if primary_squad else [])
+    await _save_squad_assignments(db, member.id, effective_ids)
     await db.commit()
     await db.refresh(member)
-    return member
+    return _member_to_dict(member, effective_ids)
 
 
 async def get_all_members(
     db: AsyncSession,
     squad_id: int | None = None,
     status: str | None = None,
-) -> list[TeamMember]:
+    current_user=None,
+) -> list[dict]:
+    from app.modules.auth.models import UserRole
+
     query = select(TeamMember).order_by(TeamMember.name)
-    if squad_id:
+
+    # Gerente: filter to own squad only
+    if current_user and current_user.role == UserRole.GERENTE:
+        my_member_res = await db.execute(
+            select(TeamMember).where(TeamMember.user_id == current_user.id)
+        )
+        my_member = my_member_res.scalar_one_or_none()
+        if my_member and my_member.squad_id:
+            # Show all members who share any squad assignment with gerente's squad
+            squad_member_ids = await db.execute(
+                select(MemberSquad.member_id).where(
+                    MemberSquad.squad_id == my_member.squad_id
+                )
+            )
+            ids = [r[0] for r in squad_member_ids.all()]
+            # Also include members with squad_id == gerente's squad (legacy)
+            query = query.where(
+                (TeamMember.squad_id == my_member.squad_id) |
+                (TeamMember.id.in_(ids))
+            )
+        elif my_member:
+            # No squad, only see themselves
+            query = query.where(TeamMember.id == my_member.id)
+        else:
+            # User not linked to any member: return empty
+            return []
+    elif squad_id:
         query = query.where(TeamMember.squad_id == squad_id)
+
     if status:
         query = query.where(TeamMember.status == status)
+
     result = await db.execute(query)
-    return list(result.scalars().all())
+    members = result.scalars().all()
+
+    out = []
+    for m in members:
+        sids = await _get_squad_ids_for_member(db, m.id)
+        out.append(_member_to_dict(m, sids))
+    return out
 
 
 async def get_member_by_id(db: AsyncSession, member_id: int) -> TeamMember:
@@ -94,8 +164,9 @@ async def get_member_by_id(db: AsyncSession, member_id: int) -> TeamMember:
 
 async def get_member_detail(db: AsyncSession, member_id: int) -> dict:
     member = await get_member_by_id(db, member_id)
+    sids = await _get_squad_ids_for_member(db, member_id)
     return {
-        **{c.key: getattr(member, c.key) for c in TeamMember.__table__.columns},
+        **_member_to_dict(member, sids),
         "squad_name": member.squad.name if member.squad else None,
         "allocations": member.allocations,
     }
@@ -103,13 +174,23 @@ async def get_member_detail(db: AsyncSession, member_id: int) -> dict:
 
 async def update_member(
     db: AsyncSession, member_id: int, data: TeamMemberUpdate
-) -> TeamMember:
+) -> dict:
     member = await get_member_by_id(db, member_id)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    squad_ids = update_data.pop("squad_ids", None)
+
+    # If squad_ids provided, update primary squad_id too
+    if squad_ids is not None:
+        primary = squad_ids[0] if squad_ids else None
+        update_data["squad_id"] = primary
+        await _save_squad_assignments(db, member_id, squad_ids)
+
+    for field, value in update_data.items():
         setattr(member, field, value)
     await db.commit()
     await db.refresh(member)
-    return member
+    effective_sids = squad_ids if squad_ids is not None else await _get_squad_ids_for_member(db, member_id)
+    return _member_to_dict(member, effective_sids)
 
 
 async def delete_member(db: AsyncSession, member_id: int) -> None:
@@ -120,7 +201,6 @@ async def delete_member(db: AsyncSession, member_id: int) -> None:
 
 # === Allocation ===
 async def create_allocation(db: AsyncSession, data: AllocationCreate) -> dict:
-    # Enforce: 1 collaborator per client (no duplicate member+client)
     existing_member = await db.execute(
         select(TeamAllocation).where(
             TeamAllocation.member_id == data.member_id,
@@ -133,7 +213,6 @@ async def create_allocation(db: AsyncSession, data: AllocationCreate) -> dict:
             detail="Este colaborador ja esta alocado neste cliente"
         )
 
-    # Enforce: 1 per role per client (no duplicate role_title+client)
     member_result = await db.execute(
         select(TeamMember).where(TeamMember.id == data.member_id)
     )

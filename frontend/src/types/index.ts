@@ -60,6 +60,7 @@ export interface TeamMember {
   name: string;
   role_title: string;
   squad_id: number | null;
+  squad_ids: number[];
   user_id: number | null;
   email: string | null;
   phone: string | null;

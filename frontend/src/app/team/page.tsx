@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
-import { teamApi, clientsApi, demandsApi } from '@/services/api';
+import { teamApi, clientsApi, demandsApi, authApi } from '@/services/api';
+import { User as UserType } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { Squad, TeamMember, Allocation, Client, Demand } from '@/types';
@@ -11,13 +12,14 @@ import { Users, UserPlus, Link2, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const emptySquadForm = { name: '', description: '' };
-const emptyMemberForm = { name: '', role_title: '', squad_id: '', email: '', phone: '', status: 'active' };
+const emptyMemberForm = { name: '', role_title: '', squad_ids: [] as number[], email: '', phone: '', status: 'active', user_id: '' };
 const emptyAllocForm = { member_id: '', client_id: '', monthly_value: '', start_date: '', end_date: '' };
 
 export default function TeamPage() {
   const [squads, setSquads] = useState<Squad[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<UserType[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,10 @@ export default function TeamPage() {
       setClients(clientsRes.data);
       setAllocations(allocsRes.data);
       setDemands(demandsRes.data);
+      if (isAdmin) {
+        const usersRes = await authApi.getUsers();
+        setUsers(usersRes.data);
+      }
     } catch { toast.error('Erro ao carregar dados'); }
     finally { setLoading(false); }
   };
@@ -178,10 +184,13 @@ export default function TeamPage() {
   const openEditMember = (member: TeamMember) => {
     setEditingMember(member);
     setMemberForm({
-      name: member.name, role_title: member.role_title,
-      squad_id: member.squad_id?.toString() || '',
-      email: member.email || '', phone: member.phone || '',
+      name: member.name,
+      role_title: member.role_title,
+      squad_ids: member.squad_ids?.length ? member.squad_ids : (member.squad_id ? [member.squad_id] : []),
+      email: member.email || '',
+      phone: member.phone || '',
       status: member.status,
+      user_id: member.user_id?.toString() || '',
     });
     setShowMemberModal(true);
   };
@@ -189,8 +198,14 @@ export default function TeamPage() {
   const handleMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
-      ...memberForm,
-      squad_id: memberForm.squad_id ? Number(memberForm.squad_id) : null,
+      name: memberForm.name,
+      role_title: memberForm.role_title,
+      squad_ids: memberForm.squad_ids,
+      squad_id: memberForm.squad_ids[0] ?? null,
+      email: memberForm.email || null,
+      phone: memberForm.phone || null,
+      status: memberForm.status,
+      user_id: memberForm.user_id ? Number(memberForm.user_id) : null,
     };
     try {
       if (editingMember) {
@@ -217,12 +232,13 @@ export default function TeamPage() {
   // Allocation handlers
   const handleCreateAlloc = async (e: React.FormEvent) => {
     e.preventDefault();
+    const today = new Date().toISOString().slice(0, 10);
     try {
       await teamApi.createAllocation({
         member_id: Number(allocForm.member_id),
         client_id: Number(allocForm.client_id),
         monthly_value: Number(allocForm.monthly_value),
-        start_date: allocForm.start_date,
+        start_date: allocForm.start_date || today,
         end_date: allocForm.end_date || null,
       });
       toast.success('Alocação criada');
@@ -362,7 +378,12 @@ export default function TeamPage() {
                         <td className="px-4 py-4 font-medium">{member.name}</td>
                         <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{member.role_title}</td>
                         <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {squads.find(s => s.id === member.squad_id)?.name || <span className="text-gray-300">—</span>}
+                          {(member.squad_ids?.length
+                            ? member.squad_ids.map(sid => squads.find(s => s.id === sid)?.name).filter(Boolean)
+                            : member.squad_id ? [squads.find(s => s.id === member.squad_id)?.name] : []
+                          ).map((name, i) => (
+                            <span key={i} className="inline-block bg-gray-100 dark:bg-dark-600 rounded px-1.5 py-0.5 text-xs mr-1">{name}</span>
+                          )) || <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-4 text-center">
                           <span className="inline-flex items-center justify-center bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-sm font-semibold rounded-full w-8 h-8">
@@ -526,13 +547,49 @@ export default function TeamPage() {
               </datalist>
               <p className="text-xs text-gray-400 mt-1">Escolha um cargo existente ou digite para criar novo</p>
             </div>
+
+            {/* Multi-squad checkboxes */}
             <div>
-              <label className="block text-sm font-medium mb-1">Squad</label>
-              <select className="input-field" value={memberForm.squad_id} onChange={e => setMemberForm({...memberForm, squad_id: e.target.value})}>
-                <option value="">Sem squad</option>
-                {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <label className="block text-sm font-medium mb-2">Squads</label>
+              <div className="grid grid-cols-2 gap-2">
+                {squads.map(s => (
+                  <label key={s.id} className="flex items-center gap-2 cursor-pointer text-sm p-2 rounded border dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700">
+                    <input
+                      type="checkbox"
+                      checked={memberForm.squad_ids.includes(s.id)}
+                      onChange={e => {
+                        const ids = e.target.checked
+                          ? [...memberForm.squad_ids, s.id]
+                          : memberForm.squad_ids.filter(id => id !== s.id);
+                        setMemberForm({ ...memberForm, squad_ids: ids });
+                      }}
+                      className="rounded"
+                    />
+                    {s.name}
+                  </label>
+                ))}
+                {squads.length === 0 && <p className="text-gray-400 text-sm col-span-2">Nenhum squad criado</p>}
+              </div>
             </div>
+
+            {/* User link — admin only */}
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Usuário do sistema</label>
+                <select
+                  className="input-field"
+                  value={memberForm.user_id}
+                  onChange={e => setMemberForm({ ...memberForm, user_id: e.target.value })}
+                >
+                  <option value="">Sem vínculo</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Vincule a um usuário para que o membro veja seus dados no dashboard</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
@@ -581,16 +638,22 @@ export default function TeamPage() {
               <label className="block text-sm font-medium mb-1">Valor Mensal (R$) *</label>
               <input type="number" step="0.01" className="input-field" value={allocForm.monthly_value} onChange={e => setAllocForm({...allocForm, monthly_value: e.target.value})} required />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Data Início *</label>
-                <input type="date" className="input-field" value={allocForm.start_date} onChange={e => setAllocForm({...allocForm, start_date: e.target.value})} required />
+            {/* Only admin can set/change allocation dates */}
+            {isAdmin ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Data Início *</label>
+                  <input type="date" className="input-field" value={allocForm.start_date} onChange={e => setAllocForm({...allocForm, start_date: e.target.value})} required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Data Fim</label>
+                  <input type="date" className="input-field" value={allocForm.end_date} onChange={e => setAllocForm({...allocForm, end_date: e.target.value})} />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Data Fim</label>
-                <input type="date" className="input-field" value={allocForm.end_date} onChange={e => setAllocForm({...allocForm, end_date: e.target.value})} />
-              </div>
-            </div>
+            ) : (
+              <input type="hidden" value={allocForm.start_date || new Date().toISOString().slice(0, 10)}
+                onChange={e => setAllocForm({...allocForm, start_date: e.target.value})} />
+            )}
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setShowAllocModal(false)} className="btn-secondary">Cancelar</button>
               <button type="submit" className="btn-primary">Criar Alocação</button>

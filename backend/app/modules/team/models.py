@@ -26,6 +26,18 @@ class Squad(Base):
     members = relationship("TeamMember", back_populates="squad")
 
 
+class MemberSquad(Base):
+    """Junction table: member ↔ squad many-to-many."""
+    __tablename__ = "member_squads"
+
+    member_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("team_members.id", ondelete="CASCADE"), primary_key=True
+    )
+    squad_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("squads.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
 class TeamMember(Base):
     __tablename__ = "team_members"
 
@@ -54,6 +66,10 @@ class TeamMember(Base):
 
     squad = relationship("Squad", back_populates="members")
     allocations = relationship("TeamAllocation", back_populates="member")
+    squad_assignments = relationship(
+        "MemberSquad", cascade="all, delete-orphan",
+        primaryjoin="TeamMember.id == foreign(MemberSquad.member_id)",
+    )
 
 
 class TeamAllocation(Base):

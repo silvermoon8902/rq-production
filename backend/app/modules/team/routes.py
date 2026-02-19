@@ -62,7 +62,7 @@ async def list_members(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await services.get_all_members(db, squad_id, status)
+    return await services.get_all_members(db, squad_id, status, current_user)
 
 
 @router.get("/members/{member_id}", response_model=schemas.TeamMemberDetail)
