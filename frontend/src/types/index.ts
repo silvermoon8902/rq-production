@@ -9,21 +9,41 @@ export interface User {
 
 export interface Client {
   id: number;
-  name: string;
-  company: string | null;
+  name: string;              // Nome Fantasia
+  company: string | null;    // Razao Social
+  cnpj: string | null;
+  responsible_name: string | null;
+  phone: string | null;      // Celular Responsavel
   email: string | null;
-  phone: string | null;
-  segment: string | null;
+  segment: string | null;    // Nicho
   status: 'active' | 'inactive' | 'onboarding' | 'churned';
+  instagram: string | null;
+  website: string | null;
   notes: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  monthly_value: number | null;
+  min_contract_months: number | null;
+  operational_cost: number | null;
   created_at: string;
   updated_at: string;
 }
 
+export interface AllocationInClient {
+  id: number;
+  member_id: number;
+  member_name: string;
+  role_title: string;
+  monthly_value: number;
+  start_date: string;
+  end_date: string | null;
+}
+
 export interface ClientDetail extends Client {
-  allocations: Allocation[];
+  allocations: AllocationInClient[];
   demands_count: number;
   active_demands_count: number;
+  active_days: number | null;
 }
 
 export interface Squad {

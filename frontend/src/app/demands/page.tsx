@@ -7,8 +7,34 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { demandsApi, clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { KanbanColumn, Demand, Client, TeamMember, Squad } from '@/types';
-import { Plus, Clock, User, Building2, Filter } from 'lucide-react';
+import { Plus, Clock, User, Building2, Filter, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const priorityEmojis: Record<string, string> = {
+  low: '🟢', medium: '🟡', high: '🟠', urgent: '🚨',
+};
+
+const formatTimeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return 'agora';
+  if (hours < 24) return `${hours}h atrás`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d atrás`;
+  return `${Math.floor(days / 7)}sem atrás`;
+};
+
+const formatDeadline = (dueDateStr: string) => {
+  const diff = new Date(dueDateStr).getTime() - Date.now();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 0) {
+    const overHours = Math.abs(hours);
+    if (overHours < 24) return { text: `${overHours}h atrasado`, overdue: true };
+    return { text: `${Math.floor(overHours / 24)}d atrasado`, overdue: true };
+  }
+  if (hours < 24) return { text: `${hours}h restantes`, overdue: false };
+  return { text: `${Math.floor(hours / 24)}d restantes`, overdue: false };
+};
 
 export default function DemandsPage() {
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
@@ -19,6 +45,7 @@ export default function DemandsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const { user } = useAuthStore();
 
   // Filters
   const [filterClient, setFilterClient] = useState('');
@@ -159,8 +186,15 @@ export default function DemandsPage() {
     on_time: 'border-l-green-500', warning: 'border-l-yellow-500', overdue: 'border-l-red-500',
   };
 
-  const priorityDots: Record<string, string> = {
-    low: 'bg-gray-400', medium: 'bg-blue-400', high: 'bg-orange-400', urgent: 'bg-red-500',
+  const canEdit = user?.role === 'admin' || user?.role === 'gerente';
+
+  const handleDeleteDemand = async (id: number, title: string) => {
+    if (!confirm(`Excluir demanda "${title}"?`)) return;
+    try {
+      await demandsApi.delete(id);
+      toast.success('Demanda excluída');
+      loadBoard();
+    } catch { toast.error('Erro ao excluir demanda'); }
   };
 
   return (
@@ -299,52 +333,68 @@ export default function DemandsPage() {
                       </div>
                     )}
 
-                    {colDemands.map((demand) => (
-                      <div
-                        key={demand.id}
-                        draggable
-                        onDragStart={() => handleDragStart(demand)}
-                        className={`bg-white rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="text-sm font-medium flex-1">{demand.title}</h4>
-                          <div className={`w-2 h-2 rounded-full mt-1 ml-2 flex-shrink-0 ${priorityDots[demand.priority]}`} />
-                        </div>
-                        {demand.description && (
-                          <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
-                        )}
-                        {demand.demand_type && (
-                          <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mb-2">
-                            {demand.demand_type}
-                          </span>
-                        )}
-                        <div className="flex items-center justify-between text-xs text-gray-400">
-                          <div className="flex items-center gap-2">
-                            {demand.client_name && (
-                              <span className="flex items-center gap-1">
-                                <Building2 className="h-3 w-3" />{demand.client_name}
+                    {colDemands.map((demand) => {
+                      const deadline = demand.due_date ? formatDeadline(demand.due_date) : null;
+                      return (
+                        <div
+                          key={demand.id}
+                          draggable
+                          onDragStart={() => handleDragStart(demand)}
+                          className={`bg-white rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
+                        >
+                          <div className="flex items-start justify-between mb-1.5 gap-1">
+                            <div className="flex items-start gap-1.5 flex-1 min-w-0">
+                              <span className="text-sm flex-shrink-0 mt-0.5">{priorityEmojis[demand.priority]}</span>
+                              <h4 className="text-sm font-medium leading-snug">{demand.title}</h4>
+                            </div>
+                            {canEdit && (
+                              <button
+                                onClick={() => handleDeleteDemand(demand.id, demand.title)}
+                                className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
+                                title="Excluir demanda"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          {demand.description && (
+                            <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
+                          )}
+                          {demand.demand_type && (
+                            <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mb-2">
+                              {demand.demand_type}
+                            </span>
+                          )}
+                          <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+                            <div className="flex items-center gap-2">
+                              {demand.client_name && (
+                                <span className="flex items-center gap-1">
+                                  <Building2 className="h-3 w-3" />{demand.client_name}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {demand.assigned_to_name && (
+                                <span className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />{demand.assigned_to_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">{formatTimeAgo(demand.created_at)}</span>
+                            {deadline && (
+                              <span className={`flex items-center gap-1 font-medium ${deadline.overdue ? 'text-red-500' : 'text-gray-500'}`}>
+                                <Clock className="h-3 w-3" />{deadline.text}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            {demand.assigned_to_name && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />{demand.assigned_to_name}
-                              </span>
-                            )}
-                            {demand.due_date && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(demand.due_date).toLocaleDateString('pt-BR')}
-                              </span>
-                            )}
+                          <div className="mt-1.5">
+                            <StatusBadge status={demand.sla_status} />
                           </div>
                         </div>
-                        <div className="mt-2">
-                          <StatusBadge status={demand.sla_status} />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -366,10 +416,10 @@ export default function DemandsPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Prioridade</label>
                 <select className="input-field" value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}>
-                  <option value="low">Baixa</option>
-                  <option value="medium">Média</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
+                  <option value="low">🟢 Baixa</option>
+                  <option value="medium">🟡 Média</option>
+                  <option value="high">🟠 Alta</option>
+                  <option value="urgent">🚨 Urgente</option>
                 </select>
               </div>
               <div>

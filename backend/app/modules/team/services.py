@@ -120,6 +120,41 @@ async def delete_member(db: AsyncSession, member_id: int) -> None:
 
 # === Allocation ===
 async def create_allocation(db: AsyncSession, data: AllocationCreate) -> dict:
+    # Enforce: 1 collaborator per client (no duplicate member+client)
+    existing_member = await db.execute(
+        select(TeamAllocation).where(
+            TeamAllocation.member_id == data.member_id,
+            TeamAllocation.client_id == data.client_id,
+        )
+    )
+    if existing_member.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="Este colaborador ja esta alocado neste cliente"
+        )
+
+    # Enforce: 1 per role per client (no duplicate role_title+client)
+    member_result = await db.execute(
+        select(TeamMember).where(TeamMember.id == data.member_id)
+    )
+    member = member_result.scalar_one_or_none()
+    if member and member.role_title:
+        same_role_ids_result = await db.execute(
+            select(TeamMember.id).where(TeamMember.role_title == member.role_title)
+        )
+        same_role_ids = [row[0] for row in same_role_ids_result.all()]
+        existing_role = await db.execute(
+            select(TeamAllocation).where(
+                TeamAllocation.client_id == data.client_id,
+                TeamAllocation.member_id.in_(same_role_ids),
+            )
+        )
+        if existing_role.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ja existe um '{member.role_title}' alocado neste cliente"
+            )
+
     allocation = TeamAllocation(**data.model_dump())
     db.add(allocation)
     await db.commit()

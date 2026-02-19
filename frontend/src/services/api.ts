@@ -68,6 +68,7 @@ export const authApi = {
 // Clients
 export const clientsApi = {
   getAll: (params?: any) => api.get('/clients', { params }),
+  getNiches: () => api.get('/clients/niches'),
   getById: (id: number) => api.get(`/clients/${id}`),
   create: (data: any) => api.post('/clients', data),
   update: (id: number, data: any) => api.patch(`/clients/${id}`, data),

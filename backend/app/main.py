@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.database import engine, Base, AsyncSessionLocal
 from app.modules.auth.routes import router as auth_router
@@ -24,6 +25,20 @@ async def lifespan(app: FastAPI):
     # Startup: create tables and seed defaults
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate: add new columns to existing tables (safe - IF NOT EXISTS)
+        migrations = [
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS cnpj VARCHAR(20)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS responsible_name VARCHAR(255)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS instagram VARCHAR(255)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS website VARCHAR(500)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS start_date DATE",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS end_date DATE",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS monthly_value NUMERIC(10,2)",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS min_contract_months INTEGER",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS operational_cost NUMERIC(10,2)",
+        ]
+        for stmt in migrations:
+            await conn.execute(text(stmt))
 
     # Seed default kanban columns
     from app.modules.demands.services import seed_default_columns

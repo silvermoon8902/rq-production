@@ -8,6 +8,14 @@ from app.modules.clients import schemas, services
 router = APIRouter(prefix="/clients", tags=["Clientes"])
 
 
+@router.get("/niches", response_model=list[str])
+async def list_niches(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await services.get_niches(db)
+
+
 @router.post("", response_model=schemas.ClientResponse, status_code=201)
 async def create_client(
     data: schemas.ClientCreate,
