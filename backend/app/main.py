@@ -42,9 +42,9 @@ async def lifespan(app: FastAPI):
         )
         if not result.scalar_one_or_none():
             admin = User(
-                email="admin@rqos.com",
+                email="digitalrqmarketing@gmail.com",
                 name="Admin RQ",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash("Admin@2026"),
                 role=UserRole.ADMIN,
             )
             session.add(admin)

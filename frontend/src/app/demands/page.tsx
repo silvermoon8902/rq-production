@@ -1,44 +1,126 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { demandsApi, clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
-import { KanbanColumn, Demand, Client, TeamMember } from '@/types';
-import { Plus, GripVertical, Clock, User, Building2 } from 'lucide-react';
+import { KanbanColumn, Demand, Client, TeamMember, Squad } from '@/types';
+import { Plus, Clock, User, Building2, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function DemandsPage() {
   const [columns, setColumns] = useState<KanbanColumn[]>([]);
-  const [demands, setDemands] = useState<Record<string, Demand[]>>({});
+  const [allDemands, setAllDemands] = useState<Record<string, Demand[]>>({});
   const [clients, setClients] = useState<Client[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [squads, setSquads] = useState<Squad[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filters
   const [filterClient, setFilterClient] = useState('');
+  const [filterSquad, setFilterSquad] = useState('');
+  const [filterMember, setFilterMember] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [filterType, setFilterType] = useState('');
+
+  // Quick add
+  const [quickAddColumn, setQuickAddColumn] = useState<number | null>(null);
+  const [quickAddTitle, setQuickAddTitle] = useState('');
+  const quickAddRef = useRef<HTMLInputElement>(null);
+
   const [form, setForm] = useState({
     title: '', description: '', priority: 'medium', demand_type: '',
     client_id: '', assigned_to_id: '', sla_hours: '', due_date: '',
   });
   const [draggedDemand, setDraggedDemand] = useState<Demand | null>(null);
 
-  useEffect(() => { loadBoard(); }, [filterClient]);
+  useEffect(() => { loadBoard(); }, []);
+
+  useEffect(() => {
+    if (quickAddColumn !== null && quickAddRef.current) {
+      quickAddRef.current.focus();
+    }
+  }, [quickAddColumn]);
 
   const loadBoard = async () => {
     try {
-      const params: any = {};
-      if (filterClient) params.client_id = Number(filterClient);
-      const [boardRes, clientsRes, membersRes] = await Promise.all([
-        demandsApi.getBoard(params), clientsApi.getAll(), teamApi.getMembers(),
+      const [boardRes, clientsRes, membersRes, squadsRes] = await Promise.all([
+        demandsApi.getBoard(), clientsApi.getAll(), teamApi.getMembers(), teamApi.getSquads(),
       ]);
       setColumns(boardRes.data.columns);
-      setDemands(boardRes.data.demands);
+      setAllDemands(boardRes.data.demands);
       setClients(clientsRes.data);
       setMembers(membersRes.data);
+      setSquads(squadsRes.data);
     } catch { toast.error('Erro ao carregar board'); }
     finally { setLoading(false); }
+  };
+
+  // Extract unique demand types and role titles for filters
+  const demandTypes = useMemo(() => {
+    const types = new Set<string>();
+    Object.values(allDemands).flat().forEach(d => {
+      if (d.demand_type) types.add(d.demand_type);
+    });
+    return Array.from(types).sort();
+  }, [allDemands]);
+
+  const roleTitles = useMemo(() => {
+    const roles = new Set<string>();
+    members.forEach(m => { if (m.role_title) roles.add(m.role_title); });
+    return Array.from(roles).sort();
+  }, [members]);
+
+  // Filter demands per column
+  const filteredDemands = useMemo(() => {
+    const squadMemberIds = filterSquad
+      ? members.filter(m => m.squad_id === Number(filterSquad)).map(m => m.id)
+      : null;
+    const roleMemberIds = filterRole
+      ? members.filter(m => m.role_title === filterRole).map(m => m.id)
+      : null;
+
+    const filtered: Record<string, Demand[]> = {};
+    for (const [colId, colDemands] of Object.entries(allDemands)) {
+      filtered[colId] = colDemands.filter(d => {
+        if (filterClient && d.client_id !== Number(filterClient)) return false;
+        if (filterMember && d.assigned_to_id !== Number(filterMember)) return false;
+        if (filterType && d.demand_type !== filterType) return false;
+        if (squadMemberIds && (!d.assigned_to_id || !squadMemberIds.includes(d.assigned_to_id))) return false;
+        if (roleMemberIds && (!d.assigned_to_id || !roleMemberIds.includes(d.assigned_to_id))) return false;
+        return true;
+      });
+    }
+    return filtered;
+  }, [allDemands, filterClient, filterSquad, filterMember, filterRole, filterType, members]);
+
+  const activeFilterCount = [filterClient, filterSquad, filterMember, filterRole, filterType].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setFilterClient(''); setFilterSquad(''); setFilterMember(''); setFilterRole(''); setFilterType('');
+  };
+
+  // Quick add demand
+  const handleQuickAdd = async (columnId: number) => {
+    if (!quickAddTitle.trim()) {
+      setQuickAddColumn(null);
+      return;
+    }
+    try {
+      await demandsApi.create({
+        title: quickAddTitle.trim(),
+        column_id: columnId,
+        priority: 'medium',
+      });
+      toast.success('Demanda criada');
+      setQuickAddTitle('');
+      setQuickAddColumn(null);
+      loadBoard();
+    } catch { toast.error('Erro ao criar demanda'); }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -58,13 +140,8 @@ export default function DemandsPage() {
     } catch { toast.error('Erro ao criar demanda'); }
   };
 
-  const handleDragStart = (demand: Demand) => {
-    setDraggedDemand(demand);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+  const handleDragStart = (demand: Demand) => { setDraggedDemand(demand); };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
 
   const handleDrop = async (columnId: number) => {
     if (!draggedDemand || draggedDemand.column_id === columnId) {
@@ -79,16 +156,11 @@ export default function DemandsPage() {
   };
 
   const slaColors: Record<string, string> = {
-    on_time: 'border-l-green-500',
-    warning: 'border-l-yellow-500',
-    overdue: 'border-l-red-500',
+    on_time: 'border-l-green-500', warning: 'border-l-yellow-500', overdue: 'border-l-red-500',
   };
 
   const priorityDots: Record<string, string> = {
-    low: 'bg-gray-400',
-    medium: 'bg-blue-400',
-    high: 'bg-orange-400',
-    urgent: 'bg-red-500',
+    low: 'bg-gray-400', medium: 'bg-blue-400', high: 'bg-orange-400', urgent: 'bg-red-500',
   };
 
   return (
@@ -97,22 +169,77 @@ export default function DemandsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Demandas</h1>
-            <p className="text-gray-500 mt-1">Kanban com controle de SLA</p>
+            <p className="text-gray-500 mt-1">
+              Kanban com controle de SLA
+              {filterType && <span className="ml-2 text-primary-600 font-medium">— {filterType}</span>}
+            </p>
           </div>
           <div className="flex items-center gap-3">
-            <select
-              className="input-field w-48"
-              value={filterClient}
-              onChange={(e) => setFilterClient(e.target.value)}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`btn-secondary flex items-center gap-2 ${activeFilterCount > 0 ? 'ring-2 ring-primary-300' : ''}`}
             >
-              <option value="">Todos os clientes</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              <Filter className="h-4 w-4" /> Filtros
+              {activeFilterCount > 0 && (
+                <span className="bg-primary-300 text-dark-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
             <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
               <Plus className="h-4 w-4" /> Nova Demanda
             </button>
           </div>
         </div>
+
+        {/* Filters bar */}
+        {showFilters && (
+          <div className="card mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-600">Filtros</h3>
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700">Limpar filtros</button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Cliente</label>
+                <select className="input-field text-sm" value={filterClient} onChange={e => setFilterClient(e.target.value)}>
+                  <option value="">Todos</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Squad</label>
+                <select className="input-field text-sm" value={filterSquad} onChange={e => setFilterSquad(e.target.value)}>
+                  <option value="">Todos</option>
+                  {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Colaborador</label>
+                <select className="input-field text-sm" value={filterMember} onChange={e => setFilterMember(e.target.value)}>
+                  <option value="">Todos</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Cargo</label>
+                <select className="input-field text-sm" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+                  <option value="">Todos</option>
+                  {roleTitles.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Tipo / Área</label>
+                <select className="input-field text-sm" value={filterType} onChange={e => setFilterType(e.target.value)}>
+                  <option value="">Todos</option>
+                  {demandTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -120,68 +247,108 @@ export default function DemandsPage() {
           </div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {columns.map((column) => (
-              <div
-                key={column.id}
-                className="flex-shrink-0 w-80 bg-gray-100 rounded-xl p-4"
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(column.id)}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
-                    <h3 className="font-semibold text-sm">{column.name}</h3>
-                  </div>
-                  <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
-                    {(demands[String(column.id)] || []).length}
-                  </span>
-                </div>
-
-                <div className="space-y-3 min-h-[200px]">
-                  {(demands[String(column.id)] || []).map((demand) => (
-                    <div
-                      key={demand.id}
-                      draggable
-                      onDragStart={() => handleDragStart(demand)}
-                      className={`bg-white rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="text-sm font-medium flex-1">{demand.title}</h4>
-                        <div className={`w-2 h-2 rounded-full mt-1 ${priorityDots[demand.priority]}`} />
-                      </div>
-                      {demand.description && (
-                        <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
-                      )}
-                      <div className="flex items-center justify-between text-xs text-gray-400">
-                        <div className="flex items-center gap-2">
-                          {demand.client_name && (
-                            <span className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3" />{demand.client_name}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {demand.assigned_to_name && (
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3" />{demand.assigned_to_name}
-                            </span>
-                          )}
-                          {demand.due_date && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(demand.due_date).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <StatusBadge status={demand.sla_status} />
-                      </div>
+            {columns.map((column) => {
+              const colDemands = filteredDemands[String(column.id)] || [];
+              return (
+                <div
+                  key={column.id}
+                  className="flex-shrink-0 w-80 bg-gray-100 rounded-xl p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={() => handleDrop(column.id)}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: column.color }} />
+                      <h3 className="font-semibold text-sm">{column.name}</h3>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
+                        {colDemands.length}
+                      </span>
+                      <button
+                        onClick={() => { setQuickAddColumn(column.id); setQuickAddTitle(''); }}
+                        className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-primary-300 hover:text-dark-900 text-gray-400 transition-colors text-sm font-bold"
+                        title="Adicionar demanda rápida"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 min-h-[200px]">
+                    {/* Quick add inline */}
+                    {quickAddColumn === column.id && (
+                      <div className="bg-white rounded-lg p-3 shadow-sm border-2 border-primary-300">
+                        <input
+                          ref={quickAddRef}
+                          type="text"
+                          value={quickAddTitle}
+                          onChange={e => setQuickAddTitle(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleQuickAdd(column.id);
+                            if (e.key === 'Escape') { setQuickAddColumn(null); setQuickAddTitle(''); }
+                          }}
+                          onBlur={() => {
+                            if (quickAddTitle.trim()) handleQuickAdd(column.id);
+                            else { setQuickAddColumn(null); setQuickAddTitle(''); }
+                          }}
+                          placeholder="Título da demanda..."
+                          className="w-full text-sm border-none outline-none placeholder-gray-400"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Enter para criar · Esc para cancelar</p>
+                      </div>
+                    )}
+
+                    {colDemands.map((demand) => (
+                      <div
+                        key={demand.id}
+                        draggable
+                        onDragStart={() => handleDragStart(demand)}
+                        className={`bg-white rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1">{demand.title}</h4>
+                          <div className={`w-2 h-2 rounded-full mt-1 ml-2 flex-shrink-0 ${priorityDots[demand.priority]}`} />
+                        </div>
+                        {demand.description && (
+                          <p className="text-xs text-gray-500 mb-2 line-clamp-2">{demand.description}</p>
+                        )}
+                        {demand.demand_type && (
+                          <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mb-2">
+                            {demand.demand_type}
+                          </span>
+                        )}
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <div className="flex items-center gap-2">
+                            {demand.client_name && (
+                              <span className="flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />{demand.client_name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {demand.assigned_to_name && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />{demand.assigned_to_name}
+                              </span>
+                            )}
+                            {demand.due_date && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(demand.due_date).toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <StatusBadge status={demand.sla_status} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -206,8 +373,11 @@ export default function DemandsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Tipo</label>
-                <input className="input-field" placeholder="Ex: Design, Tráfego, Copy..." value={form.demand_type} onChange={e => setForm({...form, demand_type: e.target.value})} />
+                <label className="block text-sm font-medium mb-1">Tipo / Área</label>
+                <input className="input-field" placeholder="Ex: Design, Tráfego, Copy..." value={form.demand_type} onChange={e => setForm({...form, demand_type: e.target.value})} list="demand-types" />
+                <datalist id="demand-types">
+                  {demandTypes.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -222,7 +392,7 @@ export default function DemandsPage() {
                 <label className="block text-sm font-medium mb-1">Responsável</label>
                 <select className="input-field" value={form.assigned_to_id} onChange={e => setForm({...form, assigned_to_id: e.target.value})}>
                   <option value="">Sem responsável</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>)}
                 </select>
               </div>
             </div>
