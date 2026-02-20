@@ -141,6 +141,25 @@ async def get_demand_history(
     return await services.get_demand_history(db, demand_id)
 
 
+@router.get("/{demand_id}/comments", response_model=list[schemas.CommentResponse])
+async def list_comments(
+    demand_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await services.get_comments(db, demand_id)
+
+
+@router.post("/{demand_id}/comments", response_model=schemas.CommentResponse, status_code=201)
+async def add_comment(
+    demand_id: int,
+    data: schemas.CommentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await services.create_comment(db, demand_id, data, current_user.id)
+
+
 @router.delete("/{demand_id}", status_code=204)
 async def delete_demand(
     demand_id: int,

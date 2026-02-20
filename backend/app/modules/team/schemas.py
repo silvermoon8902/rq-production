@@ -76,6 +76,11 @@ class AllocationCreate(BaseModel):
     end_date: date | None = None
 
 
+class BulkAllocationResult(BaseModel):
+    created: int
+    skipped: int
+
+
 class AllocationUpdate(BaseModel):
     monthly_value: float | None = None
     start_date: date | None = None

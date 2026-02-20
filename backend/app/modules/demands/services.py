@@ -4,13 +4,15 @@ from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from app.modules.demands.models import (
-    Demand, DemandStatus, KanbanColumn, DemandHistory, SLAStatus,
+    Demand, DemandStatus, KanbanColumn, DemandHistory, SLAStatus, DemandComment,
 )
 from app.modules.demands.schemas import (
     DemandCreate, DemandUpdate, DemandMove, KanbanColumnCreate, KanbanColumnUpdate,
+    CommentCreate,
 )
 from app.modules.clients.models import Client
 from app.modules.team.models import TeamMember
+from app.modules.auth.models import User
 
 
 # === Kanban Columns ===
@@ -130,6 +132,7 @@ async def _compute_in_progress_hours(db: AsyncSession, demand_id: int) -> float 
 async def _enrich_demand(db: AsyncSession, demand: Demand) -> dict:
     client_name = None
     assigned_name = None
+    column_name = None
     if demand.client_id:
         r = await db.execute(select(Client.name).where(Client.id == demand.client_id))
         client_name = r.scalar_one_or_none()
@@ -138,13 +141,59 @@ async def _enrich_demand(db: AsyncSession, demand: Demand) -> dict:
             select(TeamMember.name).where(TeamMember.id == demand.assigned_to_id)
         )
         assigned_name = r.scalar_one_or_none()
+    if demand.column_id:
+        r = await db.execute(
+            select(KanbanColumn.name).where(KanbanColumn.id == demand.column_id)
+        )
+        column_name = r.scalar_one_or_none()
+    count_res = await db.execute(
+        select(func.count(DemandComment.id)).where(DemandComment.demand_id == demand.id)
+    )
+    comments_count = count_res.scalar() or 0
     in_progress_hours = await _compute_in_progress_hours(db, demand.id)
     return {
         **{c.key: getattr(demand, c.key) for c in Demand.__table__.columns},
         "sla_status": _compute_sla_status(demand),
         "client_name": client_name,
         "assigned_to_name": assigned_name,
+        "column_name": column_name,
+        "comments_count": comments_count,
         "in_progress_hours": in_progress_hours,
+    }
+
+
+async def get_comments(db: AsyncSession, demand_id: int) -> list[dict]:
+    result = await db.execute(
+        select(DemandComment)
+        .where(DemandComment.demand_id == demand_id)
+        .order_by(DemandComment.created_at)
+    )
+    comments = result.scalars().all()
+    enriched = []
+    for c in comments:
+        user_name = None
+        if c.user_id:
+            r = await db.execute(select(User.name).where(User.id == c.user_id))
+            user_name = r.scalar_one_or_none()
+        enriched.append({
+            **{col.key: getattr(c, col.key) for col in DemandComment.__table__.columns},
+            "user_name": user_name,
+        })
+    return enriched
+
+
+async def create_comment(
+    db: AsyncSession, demand_id: int, data: CommentCreate, user_id: int
+) -> dict:
+    comment = DemandComment(demand_id=demand_id, user_id=user_id, text=data.text)
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+    r = await db.execute(select(User.name).where(User.id == user_id))
+    user_name = r.scalar_one_or_none()
+    return {
+        **{col.key: getattr(comment, col.key) for col in DemandComment.__table__.columns},
+        "user_name": user_name,
     }
 
 

@@ -74,10 +74,26 @@ function KpiCard({
   );
 }
 
+type PeriodPreset = 'this_month' | 'last_month' | 'custom';
+
+function getMonthRange(offset: number) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + offset; // offset=0 → this month, -1 → last month
+  const first = new Date(y, m, 1);
+  const last = new Date(y, m + 1, 0);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: fmt(first), to: fmt(last) };
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>(emptyStats);
   const [myClients, setMyClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('this_month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [showCustom, setShowCustom] = useState(false);
   const { user } = useAuthStore();
   const { isHidden } = useFinanceVisibilityStore();
 
@@ -87,13 +103,26 @@ export default function DashboardPage() {
   const fmtMoney = (v: number) =>
     isHidden ? 'R$ •••••' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
+  const getDateParams = () => {
+    if (periodPreset === 'this_month') {
+      const r = getMonthRange(0);
+      return { date_from: r.from, date_to: r.to };
+    }
+    if (periodPreset === 'last_month') {
+      const r = getMonthRange(-1);
+      return { date_from: r.from, date_to: r.to };
+    }
+    return { date_from: customFrom || undefined, date_to: customTo || undefined };
+  };
+
   useEffect(() => {
     if (user) loadStats();
-  }, [user]);
+  }, [user, periodPreset, customFrom, customTo]);
 
   const loadStats = async () => {
+    setLoading(true);
     try {
-      const { data } = await dashboardApi.getStats();
+      const { data } = await dashboardApi.getStats(getDateParams());
       setStats(data);
 
       if (isNonAdmin) {
@@ -124,11 +153,44 @@ export default function DashboardPage() {
   return (
     <AuthGuard>
       <div>
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
-          <p className="text-gray-500 mt-1">
-            {isNonAdmin ? `Olá, ${user?.name}` : 'Visão geral da operação'}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
+            <p className="text-gray-500 mt-1">
+              {isNonAdmin ? `Olá, ${user?.name}` : 'Visão geral da operação'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => { setPeriodPreset('this_month'); setShowCustom(false); }}
+              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${periodPreset === 'this_month' ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700'}`}
+            >Este mês</button>
+            <button
+              onClick={() => { setPeriodPreset('last_month'); setShowCustom(false); }}
+              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${periodPreset === 'last_month' ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700'}`}
+            >Mês passado</button>
+            <button
+              onClick={() => { setPeriodPreset('custom'); setShowCustom(true); }}
+              className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${periodPreset === 'custom' ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700'}`}
+            >Personalizado</button>
+            {showCustom && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="date"
+                  className="input-field text-sm py-1 w-auto"
+                  value={customFrom}
+                  onChange={e => setCustomFrom(e.target.value)}
+                />
+                <span className="text-gray-400 text-sm">até</span>
+                <input
+                  type="date"
+                  className="input-field text-sm py-1 w-auto"
+                  value={customTo}
+                  onChange={e => setCustomTo(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -195,7 +257,10 @@ export default function DashboardPage() {
 
             {/* ── DEMANDAS ── */}
             <div>
-              <SectionHeader title="Demandas" href="/demands" />
+              <SectionHeader
+                title={`Demandas${periodPreset === 'this_month' ? ' — este mês' : periodPreset === 'last_month' ? ' — mês passado' : ''}`}
+                href="/demands"
+              />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="card p-3 text-center">
                   <p className="text-xs text-gray-400 mb-1">Backlog</p>

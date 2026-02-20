@@ -65,6 +65,7 @@ class DemandResponse(BaseModel):
     status: DemandStatus
     demand_type: str | None
     column_id: int | None
+    column_name: str | None = None
     position: int
     client_id: int | None
     assigned_to_id: int | None
@@ -78,6 +79,22 @@ class DemandResponse(BaseModel):
     client_name: str | None = None
     assigned_to_name: str | None = None
     in_progress_hours: float | None = None
+    comments_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    text: str
+
+
+class CommentResponse(BaseModel):
+    id: int
+    demand_id: int
+    user_id: int | None
+    text: str
+    created_at: datetime
+    user_name: str | None = None
 
     model_config = {"from_attributes": True}
 

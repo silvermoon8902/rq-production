@@ -7,8 +7,9 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { demandsApi, clientsApi, teamApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { KanbanColumn, Demand, Client, TeamMember, Squad } from '@/types';
-import { Plus, Clock, User, Building2, Filter, Trash2, Pencil } from 'lucide-react';
+import { Plus, Clock, User, Building2, Filter, Trash2, Pencil, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DemandPreviewModal from '@/components/ui/DemandPreviewModal';
 
 const priorityEmojis: Record<string, string> = {
   low: '🟢', medium: '🟡', high: '🟠', urgent: '🚨',
@@ -53,6 +54,7 @@ export default function DemandsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [previewDemand, setPreviewDemand] = useState<Demand | null>(null);
   const { user } = useAuthStore();
 
   // Filters
@@ -402,14 +404,15 @@ export default function DemandsPage() {
                           key={demand.id}
                           draggable
                           onDragStart={() => handleDragStart(demand)}
-                          className={`bg-white dark:bg-dark-700 rounded-lg p-3 shadow-sm border-l-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
+                          onClick={() => setPreviewDemand(demand)}
+                          className={`bg-white dark:bg-dark-700 rounded-lg p-3 shadow-sm border-l-4 cursor-pointer hover:shadow-md transition-shadow ${slaColors[demand.sla_status] || 'border-l-gray-200'}`}
                         >
                           <div className="flex items-start justify-between mb-1.5 gap-1">
                             <div className="flex items-start gap-1.5 flex-1 min-w-0">
                               <span className="text-sm flex-shrink-0 mt-0.5">{priorityEmojis[demand.priority]}</span>
                               <h4 className="text-sm font-medium leading-snug">{demand.title}</h4>
                             </div>
-                            <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                            <div className="flex items-center gap-1 flex-shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); openEditDemand(demand); }}
                                 className="text-gray-300 hover:text-primary-500 transition-colors"
@@ -462,11 +465,18 @@ export default function DemandsPage() {
                           </div>
                           <div className="mt-1.5 flex items-center justify-between">
                             <StatusBadge status={demand.sla_status} />
-                            {demand.in_progress_hours != null && (
-                              <span className="text-xs text-green-600 font-medium flex items-center gap-1" title="Tempo em progresso até conclusão">
-                                ✓ {formatInProgressTime(demand.in_progress_hours)}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {demand.comments_count > 0 && (
+                                <span className="text-xs text-gray-400 flex items-center gap-1">
+                                  <MessageSquare className="h-3 w-3" />{demand.comments_count}
+                                </span>
+                              )}
+                              {demand.in_progress_hours != null && (
+                                <span className="text-xs text-green-600 font-medium flex items-center gap-1" title="Tempo em progresso até conclusão">
+                                  ✓ {formatInProgressTime(demand.in_progress_hours)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -477,6 +487,8 @@ export default function DemandsPage() {
             })}
           </div>
         )}
+
+        <DemandPreviewModal demand={previewDemand} onClose={() => setPreviewDemand(null)} />
 
         <Modal isOpen={!!editingDemand} onClose={() => setEditingDemand(null)} title="Editar Demanda" size="lg">
           <form onSubmit={handleEditDemand} className="space-y-4">

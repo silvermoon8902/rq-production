@@ -8,7 +8,7 @@ import { User as UserType } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { Squad, TeamMember, Allocation, Client, Demand } from '@/types';
-import { Users, UserPlus, Link2, Pencil, Trash2 } from 'lucide-react';
+import { Users, UserPlus, Link2, Pencil, Trash2, Plus, X, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const emptySquadForm = { name: '', description: '' };
@@ -37,6 +37,15 @@ export default function TeamPage() {
   // Allocation modal
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [allocForm, setAllocForm] = useState(emptyAllocForm);
+
+  // Bulk allocation
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkFilterSquad, setBulkFilterSquad] = useState('');
+  const [bulkFilterRole, setBulkFilterRole] = useState('');
+  const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
+  // staged: { [clientId]: { member_id: number, monthly_value: string }[] }
+  const [bulkStaged, setBulkStaged] = useState<Record<number, { member_id: number; monthly_value: string }[]>>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   // Filters
   const [filterSquad, setFilterSquad] = useState('');
@@ -259,6 +268,63 @@ export default function TeamPage() {
     } catch { toast.error('Erro ao remover alocação'); }
   };
 
+  // Bulk allocation helpers
+  const bulkFilteredMembers = useMemo(() => members.filter(m => {
+    if (m.status !== 'active') return false;
+    if (bulkFilterSquad && m.squad_id !== Number(bulkFilterSquad)) return false;
+    if (bulkFilterRole && m.role_title !== bulkFilterRole) return false;
+    return true;
+  }), [members, bulkFilterSquad, bulkFilterRole]);
+
+  const addBulkRow = (clientId: number) => {
+    setBulkStaged(prev => ({
+      ...prev,
+      [clientId]: [...(prev[clientId] || []), { member_id: 0, monthly_value: '' }],
+    }));
+  };
+
+  const removeBulkRow = (clientId: number, idx: number) => {
+    setBulkStaged(prev => {
+      const rows = [...(prev[clientId] || [])];
+      rows.splice(idx, 1);
+      return { ...prev, [clientId]: rows };
+    });
+  };
+
+  const updateBulkRow = (clientId: number, idx: number, field: 'member_id' | 'monthly_value', value: string) => {
+    setBulkStaged(prev => {
+      const rows = [...(prev[clientId] || [])];
+      rows[idx] = { ...rows[idx], [field]: field === 'member_id' ? Number(value) : value };
+      return { ...prev, [clientId]: rows };
+    });
+  };
+
+  const handleSaveBulk = async () => {
+    const items: any[] = [];
+    for (const [clientIdStr, rows] of Object.entries(bulkStaged)) {
+      const clientId = Number(clientIdStr);
+      for (const row of rows) {
+        if (!row.member_id) continue;
+        items.push({
+          member_id: row.member_id,
+          client_id: clientId,
+          monthly_value: Number(row.monthly_value) || 0,
+          start_date: bulkStartDate,
+        });
+      }
+    }
+    if (items.length === 0) { toast.error('Nenhuma alocação para salvar'); return; }
+    setBulkSaving(true);
+    try {
+      const { data } = await teamApi.createBulkAllocations(items);
+      toast.success(`${data.created} alocaç${data.created !== 1 ? 'ões' : 'ão'} criada${data.created !== 1 ? 's' : ''}${data.skipped > 0 ? ` (${data.skipped} ignorada${data.skipped !== 1 ? 's' : ''})` : ''}`);
+      setShowBulkModal(false);
+      setBulkStaged({});
+      loadData();
+    } catch { toast.error('Erro ao salvar alocações'); }
+    finally { setBulkSaving(false); }
+  };
+
   return (
     <AuthGuard>
       <div>
@@ -269,6 +335,9 @@ export default function TeamPage() {
           </div>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
+              <button onClick={() => setShowBulkModal(true)} className="btn-secondary flex items-center gap-2 text-sm">
+                <Layers className="h-4 w-4" /> Alocação em Massa
+              </button>
               <button onClick={() => setShowAllocModal(true)} className="btn-secondary flex items-center gap-2 text-sm">
                 <Link2 className="h-4 w-4" /> Alocar
               </button>
@@ -613,6 +682,119 @@ export default function TeamPage() {
               <button type="submit" className="btn-primary">{editingMember ? 'Salvar' : 'Criar'}</button>
             </div>
           </form>
+        </Modal>
+
+        {/* Bulk Allocation Modal */}
+        <Modal isOpen={showBulkModal} onClose={() => { setShowBulkModal(false); setBulkStaged({}); }} title="Alocação em Massa" size="lg">
+          <div className="space-y-4">
+            {/* Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Squad</label>
+                <select className="input-field text-sm" value={bulkFilterSquad} onChange={e => setBulkFilterSquad(e.target.value)}>
+                  <option value="">Todos os squads</option>
+                  {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Cargo</label>
+                <select className="input-field text-sm" value={bulkFilterRole} onChange={e => setBulkFilterRole(e.target.value)}>
+                  <option value="">Todos os cargos</option>
+                  {roleTitles.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Data Início</label>
+                <input type="date" className="input-field text-sm" value={bulkStartDate} onChange={e => setBulkStartDate(e.target.value)} />
+              </div>
+            </div>
+
+            {bulkFilteredMembers.length === 0 && (
+              <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+                Nenhum membro ativo encontrado com os filtros selecionados.
+              </p>
+            )}
+
+            {/* Client list */}
+            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1">
+              {clients.map(client => {
+                const rows = bulkStaged[client.id] || [];
+                const existingAllocs = allocations.filter(a =>
+                  a.client_id === client.id && (!a.end_date || new Date(a.end_date) >= new Date())
+                );
+                // Members already allocated to this client (by member_id)
+                const alreadyAllocatedIds = new Set(existingAllocs.map(a => a.member_id));
+                const availableForClient = bulkFilteredMembers.filter(m => !alreadyAllocatedIds.has(m.id));
+
+                return (
+                  <div key={client.id} className="border dark:border-dark-700 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="font-medium text-sm">{client.name}</span>
+                        {/* Existing allocations as chips */}
+                        {existingAllocs.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {existingAllocs.map(a => (
+                              <span key={a.id} className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
+                                {a.member_name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => addBulkRow(client.id)}
+                        disabled={availableForClient.length === 0}
+                        className="btn-secondary text-xs flex items-center gap-1 py-1 px-2 disabled:opacity-40"
+                        title={availableForClient.length === 0 ? 'Todos os membros filtrados já estão alocados' : 'Adicionar alocação'}
+                      >
+                        <Plus className="h-3 w-3" /> Adicionar
+                      </button>
+                    </div>
+
+                    {rows.map((row, idx) => (
+                      <div key={idx} className="flex items-center gap-2 mt-2">
+                        <select
+                          className="input-field text-sm flex-1"
+                          value={row.member_id || ''}
+                          onChange={e => updateBulkRow(client.id, idx, 'member_id', e.target.value)}
+                        >
+                          <option value="">Selecione o membro...</option>
+                          {availableForClient.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>
+                          ))}
+                        </select>
+                        {isAdmin && (
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="input-field text-sm w-28"
+                            placeholder="R$ 0,00"
+                            value={row.monthly_value}
+                            onChange={e => updateBulkRow(client.id, idx, 'monthly_value', e.target.value)}
+                          />
+                        )}
+                        <button onClick={() => removeBulkRow(client.id, idx)} className="text-red-400 hover:text-red-600">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t dark:border-dark-700">
+              <button onClick={() => { setShowBulkModal(false); setBulkStaged({}); }} className="btn-secondary">Cancelar</button>
+              <button
+                onClick={handleSaveBulk}
+                disabled={bulkSaving || Object.values(bulkStaged).every(rows => rows.length === 0)}
+                className="btn-primary disabled:opacity-50"
+              >
+                {bulkSaving ? 'Salvando...' : 'Salvar Alocações'}
+              </button>
+            </div>
+          </div>
         </Modal>
 
         {/* Allocation Modal */}

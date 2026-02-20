@@ -94,6 +94,15 @@ async def delete_member(
 
 
 # === Allocations ===
+@router.post("/allocations/bulk", response_model=schemas.BulkAllocationResult, status_code=201)
+async def bulk_allocations(
+    items: list[schemas.AllocationCreate],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "gerente")),
+):
+    return await services.bulk_create_allocations(db, items)
+
+
 @router.post("/allocations", response_model=schemas.AllocationResponse, status_code=201)
 async def create_allocation(
     data: schemas.AllocationCreate,

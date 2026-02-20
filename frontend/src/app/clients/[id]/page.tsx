@@ -9,7 +9,8 @@ import { clientsApi, teamApi, demandsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { ClientDetail, TeamMember, Demand } from '@/types';
-import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil, MessageSquare, Layers } from 'lucide-react';
+import DemandPreviewModal from '@/components/ui/DemandPreviewModal';
 import toast from 'react-hot-toast';
 
 const priorityEmoji: Record<string, string> = {
@@ -42,6 +43,7 @@ export default function ClientDetailPage() {
   const [filterDemandMember, setFilterDemandMember] = useState('');
   const [filterDemandType, setFilterDemandType] = useState('');
   const [filterDemandStatus, setFilterDemandStatus] = useState('');
+  const [previewDemand, setPreviewDemand] = useState<import('@/types').Demand | null>(null);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const canEdit = user?.role === 'admin' || user?.role === 'gerente';
@@ -548,13 +550,22 @@ export default function ClientDetailPage() {
             ) : (
               <div className="space-y-3">
                 {filteredDemands.map((d) => (
-                  <div key={d.id} className={`card border-l-4 ${slaColors[d.sla_status] || 'border-l-gray-200'}`}>
+                  <div
+                    key={d.id}
+                    className={`card border-l-4 cursor-pointer hover:shadow-md transition-shadow ${slaColors[d.sla_status] || 'border-l-gray-200'}`}
+                    onClick={() => setPreviewDemand(d)}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-base">{priorityEmoji[d.priority]}</span>
                           <h3 className="font-medium">{d.title}</h3>
                           <StatusBadge status={d.sla_status} />
+                          {d.column_name && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-gray-100 dark:bg-dark-700 px-2 py-0.5 rounded">
+                              <Layers className="h-3 w-3" /> {d.column_name}
+                            </span>
+                          )}
                         </div>
                         {d.description && (
                           <p className="text-sm text-gray-500 line-clamp-2 mb-2">{d.description}</p>
@@ -568,6 +579,11 @@ export default function ClientDetailPage() {
                           {d.due_date && (
                             <span className={new Date(d.due_date) < new Date() ? 'text-red-500 font-medium' : ''}>
                               Prazo: {new Date(d.due_date).toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                          {d.comments_count > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="h-3 w-3" /> {d.comments_count}
                             </span>
                           )}
                         </div>
@@ -682,6 +698,9 @@ export default function ClientDetailPage() {
             </div>
           </form>
         </Modal>
+
+        {/* Demand Preview Modal */}
+        <DemandPreviewModal demand={previewDemand} onClose={() => setPreviewDemand(null)} />
 
         {/* Allocate Modal */}
         <Modal isOpen={showAllocModal} onClose={() => setShowAllocModal(false)} title="Alocar Membro">

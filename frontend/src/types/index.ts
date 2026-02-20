@@ -97,6 +97,7 @@ export interface Demand {
   status: string;
   demand_type: string | null;
   column_id: number | null;
+  column_name: string | null;
   position: number;
   client_id: number | null;
   assigned_to_id: number | null;
@@ -110,6 +111,16 @@ export interface Demand {
   client_name: string | null;
   assigned_to_name: string | null;
   in_progress_hours: number | null;
+  comments_count: number;
+}
+
+export interface DemandComment {
+  id: number;
+  demand_id: number;
+  user_id: number | null;
+  text: string;
+  created_at: string;
+  user_name: string | null;
 }
 
 export interface ClientMeeting {

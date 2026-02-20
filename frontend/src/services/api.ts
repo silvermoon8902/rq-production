@@ -95,6 +95,7 @@ export const teamApi = {
   deleteMember: (id: number) => api.delete(`/team/members/${id}`),
   getAllocations: (params?: any) => api.get('/team/allocations', { params }),
   createAllocation: (data: any) => api.post('/team/allocations', data),
+  createBulkAllocations: (items: any[]) => api.post('/team/allocations/bulk', items),
   updateAllocation: (id: number, data: any) => api.patch(`/team/allocations/${id}`, data),
   deleteAllocation: (id: number) => api.delete(`/team/allocations/${id}`),
 };
@@ -113,11 +114,14 @@ export const demandsApi = {
   move: (id: number, data: any) => api.post(`/demands/${id}/move`, data),
   getHistory: (id: number) => api.get(`/demands/${id}/history`),
   delete: (id: number) => api.delete(`/demands/${id}`),
+  getComments: (id: number) => api.get(`/demands/${id}/comments`),
+  addComment: (id: number, data: { text: string }) => api.post(`/demands/${id}/comments`, data),
 };
 
 // Dashboard
 export const dashboardApi = {
-  getStats: () => api.get('/dashboard/stats'),
+  getStats: (params?: { date_from?: string; date_to?: string }) =>
+    api.get('/dashboard/stats', { params }),
 };
 
 // Meetings

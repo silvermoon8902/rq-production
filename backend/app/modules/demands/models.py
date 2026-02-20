@@ -98,6 +98,10 @@ class Demand(Base):
     history = relationship(
         "DemandHistory", back_populates="demand", order_by="DemandHistory.created_at"
     )
+    comments = relationship(
+        "DemandComment", back_populates="demand", order_by="DemandComment.created_at",
+        primaryjoin="Demand.id == foreign(DemandComment.demand_id)",
+    )
 
 
 class DemandHistory(Base):
@@ -118,3 +122,19 @@ class DemandHistory(Base):
     )
 
     demand = relationship("Demand", back_populates="history")
+
+
+class DemandComment(Base):
+    __tablename__ = "demand_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    demand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("demands.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, date
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, false
 from app.core.database import get_db
@@ -15,11 +15,20 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("/stats")
 async def get_stats(
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     now = datetime.now(timezone.utc)
     today = date.today()
+    # Period filter: default to current month
+    if date_from is None:
+        date_from = date(now.year, now.month, 1)
+    if date_to is None:
+        date_to = today
+    period_start = datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc)
+    period_end = datetime(date_to.year, date_to.month, date_to.day, 23, 59, 59, tzinfo=timezone.utc)
     month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
     is_admin = current_user.role == UserRole.ADMIN
 
@@ -103,21 +112,36 @@ async def get_stats(
     members_total = await db.execute(select(func.count(TeamMember.id)))
     squads_total = await db.execute(select(func.count(Squad.id)))
 
-    # ── Demands ──────────────────────────────────────────────
+    # ── Demands (filtered by period: created_at in date range) ───────────────
     demands_backlog = await db.execute(
-        with_demand_scope(select(func.count(Demand.id)).where(Demand.status == DemandStatus.BACKLOG))
+        with_demand_scope(select(func.count(Demand.id)).where(
+            Demand.status == DemandStatus.BACKLOG,
+            Demand.created_at >= period_start, Demand.created_at <= period_end,
+        ))
     )
     demands_todo = await db.execute(
-        with_demand_scope(select(func.count(Demand.id)).where(Demand.status == DemandStatus.TODO))
+        with_demand_scope(select(func.count(Demand.id)).where(
+            Demand.status == DemandStatus.TODO,
+            Demand.created_at >= period_start, Demand.created_at <= period_end,
+        ))
     )
     demands_in_progress = await db.execute(
-        with_demand_scope(select(func.count(Demand.id)).where(Demand.status == DemandStatus.IN_PROGRESS))
+        with_demand_scope(select(func.count(Demand.id)).where(
+            Demand.status == DemandStatus.IN_PROGRESS,
+            Demand.created_at >= period_start, Demand.created_at <= period_end,
+        ))
     )
     demands_in_review = await db.execute(
-        with_demand_scope(select(func.count(Demand.id)).where(Demand.status == DemandStatus.IN_REVIEW))
+        with_demand_scope(select(func.count(Demand.id)).where(
+            Demand.status == DemandStatus.IN_REVIEW,
+            Demand.created_at >= period_start, Demand.created_at <= period_end,
+        ))
     )
     demands_done = await db.execute(
-        with_demand_scope(select(func.count(Demand.id)).where(Demand.status == DemandStatus.DONE))
+        with_demand_scope(select(func.count(Demand.id)).where(
+            Demand.status == DemandStatus.DONE,
+            Demand.created_at >= period_start, Demand.created_at <= period_end,
+        ))
     )
     demands_overdue = await db.execute(
         with_demand_scope(
@@ -132,7 +156,10 @@ async def get_stats(
     # ── Meetings ─────────────────────────────────────────────
     meetings_this_month = await db.execute(
         with_meeting_scope(
-            select(func.count(ClientMeeting.id)).where(ClientMeeting.created_at >= month_start)
+            select(func.count(ClientMeeting.id)).where(
+                ClientMeeting.created_at >= period_start,
+                ClientMeeting.created_at <= period_end,
+            )
         )
     )
 

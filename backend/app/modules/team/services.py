@@ -297,3 +297,26 @@ async def _enrich_allocation(db: AsyncSession, allocation: TeamAllocation) -> di
         "member_name": m.name if m else "",
         "client_name": c.name if c else "",
     }
+
+
+async def bulk_create_allocations(db: AsyncSession, items: list[AllocationCreate]) -> dict:
+    """Create multiple allocations, skipping duplicates (same member + client)."""
+    created = 0
+    skipped = 0
+    today = __import__('datetime').date.today()
+    for item in items:
+        existing = await db.execute(
+            select(TeamAllocation).where(
+                TeamAllocation.member_id == item.member_id,
+                TeamAllocation.client_id == item.client_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            skipped += 1
+            continue
+        alloc = TeamAllocation(**item.model_dump())
+        db.add(alloc)
+        created += 1
+    if created > 0:
+        await db.commit()
+    return {"created": created, "skipped": skipped}
