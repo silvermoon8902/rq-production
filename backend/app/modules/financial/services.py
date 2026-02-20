@@ -18,7 +18,9 @@ def calculate_proportional_value(
     ref_month: int,
     ref_year: int,
 ) -> dict:
-    """Calculate proportional value using fixed 30-day basis."""
+    """Calculate proportional value using fixed 30-day basis for partial months.
+    Full month coverage always yields the full monthly value (reference = 30 days).
+    """
     days_in_cal = calendar.monthrange(ref_year, ref_month)[1]
     month_start = date(ref_year, ref_month, 1)
     month_end = date(ref_year, ref_month, days_in_cal)
@@ -31,12 +33,16 @@ def calculate_proportional_value(
     else:
         active_days = (effective_end - effective_start).days + 1
 
-    active_days = min(active_days, CALC_DAYS)
-    proportional = round((monthly_value / CALC_DAYS) * active_days, 2)
+    # Full month coverage → full value regardless of calendar days (28/28, 31/31 = 100%)
+    # Partial month → use 30-day basis
+    if active_days >= days_in_cal:
+        proportional = round(monthly_value, 2)
+    else:
+        proportional = round((monthly_value / CALC_DAYS) * active_days, 2)
 
     return {
-        "days_in_month": CALC_DAYS,
-        "active_days": active_days,
+        "days_in_month": days_in_cal,   # actual calendar days (28, 30, 31)
+        "active_days": active_days,      # actual active days in month
         "proportional_value": proportional,
     }
 

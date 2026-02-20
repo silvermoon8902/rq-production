@@ -216,8 +216,8 @@ export default function ClientDetailPage() {
 
   if (!client) return null;
 
-  const ltv = client.monthly_value && client.active_days && client.active_days > 0
-    ? (client.monthly_value * (client.active_days / 30))
+  const ltv = client.monthly_value && client.min_contract_months
+    ? (client.monthly_value * client.min_contract_months)
     : null;
 
   const margin = client.monthly_value && client.operational_cost
@@ -482,7 +482,7 @@ export default function ClientDetailPage() {
                     ) : null}
                     {ltv ? (
                       <div className="flex justify-between">
-                        <dt className="text-gray-500">LTV estimado</dt>
+                        <dt className="text-gray-500">LTV contrato mínimo</dt>
                         <dd className="font-semibold">{fmtMoney(ltv)}</dd>
                       </div>
                     ) : null}
