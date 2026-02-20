@@ -99,8 +99,7 @@ class Demand(Base):
         "DemandHistory", back_populates="demand", order_by="DemandHistory.created_at"
     )
     comments = relationship(
-        "DemandComment", back_populates="demand", order_by="DemandComment.created_at",
-        primaryjoin="Demand.id == foreign(DemandComment.demand_id)",
+        "DemandComment", order_by="DemandComment.created_at", cascade="all, delete-orphan",
     )
 
 
