@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role, decode_token
+from app.core.security import get_current_user, require_role, decode_token, verify_password, get_password_hash
 from app.modules.auth import schemas, services
 from app.modules.auth.models import User, ModulePermission
 
@@ -45,6 +45,21 @@ async def register(data: schemas.RegisterRequest, db: AsyncSession = Depends(get
 @router.get("/me", response_model=schemas.UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/change-password")
+async def change_password(
+    data: schemas.PasswordChange,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Nova senha deve ter pelo menos 6 caracteres")
+    current_user.hashed_password = get_password_hash(data.new_password)
+    await db.commit()
+    return {"message": "Senha alterada com sucesso"}
 
 
 @router.post("/users", response_model=schemas.UserResponse)

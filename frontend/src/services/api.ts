@@ -63,6 +63,8 @@ export const authApi = {
   getUsers: () => api.get('/auth/users'),
   createUser: (data: any) => api.post('/auth/users', data),
   updateUser: (id: number, data: any) => api.patch(`/auth/users/${id}`, data),
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.post('/auth/change-password', data),
 };
 
 // Permissions

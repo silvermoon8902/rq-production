@@ -36,6 +36,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     role: UserRole | None = None
     is_active: bool | None = None
+    password: str | None = None  # admin reset — hashed before saving
 
 
 class UserResponse(BaseModel):

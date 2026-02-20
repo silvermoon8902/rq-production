@@ -58,8 +58,11 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
 async def update_user(db: AsyncSession, user_id: int, data: UserUpdate) -> User:
     user = await get_user_by_id(db, user_id)
     update_data = data.model_dump(exclude_unset=True)
+    new_password = update_data.pop("password", None)
     for field, value in update_data.items():
         setattr(user, field, value)
+    if new_password:
+        user.hashed_password = get_password_hash(new_password)
     await db.commit()
     await db.refresh(user)
     return user

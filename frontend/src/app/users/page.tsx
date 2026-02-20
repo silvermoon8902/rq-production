@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
 import { authApi, permissionsApi } from '@/services/api';
+import { useAuthStore } from '@/stores/authStore';
 import { usePermissionsStore } from '@/stores/permissionsStore';
 import { User } from '@/types';
-import { Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const emptyUserForm = { name: '', email: '', password: '', role: 'colaborador', is_active: true };
@@ -33,6 +34,12 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form, setForm] = useState(emptyUserForm);
   const { matrix, setPermission } = usePermissionsStore();
+  const { user: me } = useAuthStore();
+
+  // Change-password modal (own password)
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [changingPw, setChangingPw] = useState(false);
 
   useEffect(() => { loadUsers(); }, []);
 
@@ -60,12 +67,14 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       if (editingUser) {
-        await authApi.updateUser(editingUser.id, {
+        const payload: any = {
           name: form.name,
           email: form.email,
           role: form.role,
           is_active: form.is_active,
-        });
+        };
+        if (form.password) payload.password = form.password;
+        await authApi.updateUser(editingUser.id, payload);
         toast.success('Usuário atualizado');
       } else {
         await authApi.createUser({
@@ -81,6 +90,21 @@ export default function UsersPage() {
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Erro ao salvar usuário');
     }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwForm.next !== pwForm.confirm) { toast.error('As senhas não coincidem'); return; }
+    if (pwForm.next.length < 6) { toast.error('Mínimo 6 caracteres'); return; }
+    setChangingPw(true);
+    try {
+      await authApi.changePassword({ current_password: pwForm.current, new_password: pwForm.next });
+      toast.success('Senha alterada com sucesso');
+      setShowPwModal(false);
+      setPwForm({ current: '', next: '', confirm: '' });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Erro ao alterar senha');
+    } finally { setChangingPw(false); }
   };
 
   const handleTogglePerm = async (role: string, module: string, field: 'can_read' | 'can_write') => {
@@ -121,9 +145,17 @@ export default function UsersPage() {
               <h1 className="text-xl sm:text-2xl font-bold">Usuários</h1>
               <p className="text-gray-500 mt-1">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
             </div>
-            <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-sm">
-              <Plus className="h-4 w-4" /> Novo Usuário
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setPwForm({ current: '', next: '', confirm: '' }); setShowPwModal(true); }}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <KeyRound className="h-4 w-4" /> Minha Senha
+              </button>
+              <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-sm">
+                <Plus className="h-4 w-4" /> Novo Usuário
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -281,20 +313,21 @@ export default function UsersPage() {
                 placeholder="email@exemplo.com"
               />
             </div>
-            {!editingUser && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Senha *</label>
-                <input
-                  type="password"
-                  className="input-field"
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  required
-                  minLength={6}
-                  placeholder="Mínimo 6 caracteres"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                {editingUser ? 'Nova Senha' : 'Senha *'}
+                {editingUser && <span className="text-gray-400 font-normal ml-1">(deixe em branco para manter)</span>}
+              </label>
+              <input
+                type="password"
+                className="input-field"
+                value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })}
+                required={!editingUser}
+                minLength={6}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Perfil de Acesso</label>
               <select
@@ -322,6 +355,53 @@ export default function UsersPage() {
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
               <button type="submit" className="btn-primary">{editingUser ? 'Salvar' : 'Criar Usuário'}</button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* ── Change Own Password Modal ── */}
+        <Modal isOpen={showPwModal} onClose={() => setShowPwModal(false)} title="Alterar Minha Senha">
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Senha atual *</label>
+              <input
+                type="password"
+                className="input-field"
+                value={pwForm.current}
+                onChange={e => setPwForm({ ...pwForm, current: e.target.value })}
+                required
+                placeholder="Digite sua senha atual"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Nova senha *</label>
+              <input
+                type="password"
+                className="input-field"
+                value={pwForm.next}
+                onChange={e => setPwForm({ ...pwForm, next: e.target.value })}
+                required
+                minLength={6}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Confirmar nova senha *</label>
+              <input
+                type="password"
+                className="input-field"
+                value={pwForm.confirm}
+                onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })}
+                required
+                minLength={6}
+                placeholder="Repita a nova senha"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowPwModal(false)} className="btn-secondary">Cancelar</button>
+              <button type="submit" disabled={changingPw} className="btn-primary">
+                {changingPw ? 'Salvando...' : 'Alterar Senha'}
+              </button>
             </div>
           </form>
         </Modal>
