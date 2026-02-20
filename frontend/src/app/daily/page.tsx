@@ -41,7 +41,10 @@ export default function DailyPage() {
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [registering, setRegistering] = useState<Record<number, boolean>>({});
   const [quickDemand, setQuickDemand] = useState<Record<number, boolean>>({});
-  const [demandForm, setDemandForm] = useState<Record<number, { title: string; priority: string; demand_type: string }>>({});
+  const [demandForm, setDemandForm] = useState<Record<number, {
+    title: string; priority: string; demand_type: string;
+    description: string; sla_hours: string; due_date: string; assigned_to_id: string;
+  }>>({});
   const [expandedHistory, setExpandedHistory] = useState<Record<number, boolean>>({});
   const [clientHistory, setClientHistory] = useState<Record<number, ClientMeeting[]>>({});
 
@@ -144,17 +147,19 @@ export default function DailyPage() {
   const handleQuickDemand = async (clientId: number) => {
     const form = demandForm[clientId];
     if (!form?.title?.trim()) { toast.error('Título obrigatório'); return; }
-    const team = getClientTeam(clientId);
     try {
       await demandsApi.create({
         title: form.title.trim(),
+        description: form.description || null,
         priority: form.priority || 'medium',
         demand_type: form.demand_type || null,
         client_id: clientId,
-        assigned_to_id: filterMember ? Number(filterMember) : (team[0]?.id || null),
+        assigned_to_id: form.assigned_to_id ? Number(form.assigned_to_id) : null,
+        sla_hours: form.sla_hours ? Number(form.sla_hours) : null,
+        due_date: form.due_date || null,
       });
       toast.success('Demanda criada');
-      setDemandForm(f => ({ ...f, [clientId]: { title: '', priority: 'medium', demand_type: '' } }));
+      setDemandForm(f => ({ ...f, [clientId]: { title: '', priority: 'medium', demand_type: '', description: '', sla_hours: '', due_date: '', assigned_to_id: '' } }));
       setQuickDemand(q => ({ ...q, [clientId]: false }));
     } catch { toast.error('Erro ao criar demanda'); }
   };
@@ -335,7 +340,7 @@ export default function DailyPage() {
                       <button
                         onClick={() => {
                           setQuickDemand(q => ({ ...q, [client.id]: !q[client.id] }));
-                          if (!demandForm[client.id]) setDemandForm(f => ({ ...f, [client.id]: { title: '', priority: 'medium', demand_type: '' } }));
+                          if (!demandForm[client.id]) setDemandForm(f => ({ ...f, [client.id]: { title: '', priority: 'medium', demand_type: '', description: '', sla_hours: '', due_date: '', assigned_to_id: '' } }));
                         }}
                         className="btn-secondary text-sm flex items-center gap-2"
                       >
@@ -361,6 +366,13 @@ export default function DailyPage() {
                           value={demandForm[client.id]?.title || ''}
                           onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], title: e.target.value } }))}
                         />
+                        <textarea
+                          className="input-field text-sm resize-none"
+                          rows={2}
+                          placeholder="Descrição (opcional)"
+                          value={demandForm[client.id]?.description || ''}
+                          onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], description: e.target.value } }))}
+                        />
                         <div className="grid grid-cols-2 gap-2">
                           <select
                             className="input-field text-sm"
@@ -378,6 +390,43 @@ export default function DailyPage() {
                             value={demandForm[client.id]?.demand_type || ''}
                             onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], demand_type: e.target.value } }))}
                           />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Responsável</label>
+                          <select
+                            className="input-field text-sm"
+                            value={demandForm[client.id]?.assigned_to_id || ''}
+                            onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], assigned_to_id: e.target.value } }))}
+                          >
+                            <option value="">Sem responsável</option>
+                            {getClientTeam(client.id).map(m => (
+                              <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>
+                            ))}
+                            {members.filter(m => !getClientTeam(client.id).some(t => t.id === m.id)).map(m => (
+                              <option key={m.id} value={m.id}>{m.name} — {m.role_title}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">SLA (horas)</label>
+                            <input
+                              type="number"
+                              className="input-field text-sm"
+                              placeholder="Ex: 48"
+                              value={demandForm[client.id]?.sla_hours || ''}
+                              onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], sla_hours: e.target.value } }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Prazo</label>
+                            <input
+                              type="datetime-local"
+                              className="input-field text-sm"
+                              value={demandForm[client.id]?.due_date || ''}
+                              onChange={e => setDemandForm(f => ({ ...f, [client.id]: { ...f[client.id], due_date: e.target.value } }))}
+                            />
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => handleQuickDemand(client.id)} className="btn-primary text-sm">Criar demanda</button>

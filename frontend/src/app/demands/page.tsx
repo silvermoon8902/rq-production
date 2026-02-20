@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import AuthGuard from '@/components/layout/AuthGuard';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -55,6 +55,7 @@ export default function DemandsPage() {
   const [showModal, setShowModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [previewDemand, setPreviewDemand] = useState<Demand | null>(null);
+  const [modalTitle, setModalTitle] = useState('Nova Demanda');
   const { user } = useAuthStore();
 
   // Filters
@@ -65,14 +66,9 @@ export default function DemandsPage() {
   const [filterType, setFilterType] = useState('');
   const [filterPeriod, setFilterPeriod] = useState('');
 
-  // Quick add
-  const [quickAddColumn, setQuickAddColumn] = useState<number | null>(null);
-  const [quickAddTitle, setQuickAddTitle] = useState('');
-  const quickAddRef = useRef<HTMLInputElement>(null);
-
   const [form, setForm] = useState({
     title: '', description: '', priority: 'medium', demand_type: '',
-    client_id: '', assigned_to_id: '', sla_hours: '', due_date: '',
+    client_id: '', assigned_to_id: '', sla_hours: '', due_date: '', column_id: '',
   });
   const [editingDemand, setEditingDemand] = useState<Demand | null>(null);
   const [editForm, setEditForm] = useState({
@@ -82,12 +78,6 @@ export default function DemandsPage() {
   const [draggedDemand, setDraggedDemand] = useState<Demand | null>(null);
 
   useEffect(() => { loadBoard(); }, []);
-
-  useEffect(() => {
-    if (quickAddColumn !== null && quickAddRef.current) {
-      quickAddRef.current.focus();
-    }
-  }, [quickAddColumn]);
 
   const loadBoard = async () => {
     try {
@@ -151,38 +141,23 @@ export default function DemandsPage() {
     setFilterClient(''); setFilterSquad(''); setFilterMember(''); setFilterRole(''); setFilterType(''); setFilterPeriod('');
   };
 
-  // Quick add demand
-  const handleQuickAdd = async (columnId: number) => {
-    if (!quickAddTitle.trim()) {
-      setQuickAddColumn(null);
-      return;
-    }
-    try {
-      await demandsApi.create({
-        title: quickAddTitle.trim(),
-        column_id: columnId,
-        priority: 'medium',
-      });
-      toast.success('Demanda criada');
-      setQuickAddTitle('');
-      setQuickAddColumn(null);
-      loadBoard();
-    } catch { toast.error('Erro ao criar demanda'); }
-  };
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await demandsApi.create({
-        ...form,
+        title: form.title,
+        description: form.description || null,
+        priority: form.priority,
+        demand_type: form.demand_type || null,
         client_id: form.client_id ? Number(form.client_id) : null,
         assigned_to_id: form.assigned_to_id ? Number(form.assigned_to_id) : null,
         sla_hours: form.sla_hours ? Number(form.sla_hours) : null,
         due_date: form.due_date || null,
+        column_id: form.column_id ? Number(form.column_id) : null,
       });
       toast.success('Demanda criada');
       setShowModal(false);
-      setForm({ title: '', description: '', priority: 'medium', demand_type: '', client_id: '', assigned_to_id: '', sla_hours: '', due_date: '' });
+      setForm({ title: '', description: '', priority: 'medium', demand_type: '', client_id: '', assigned_to_id: '', sla_hours: '', due_date: '', column_id: '' });
       loadBoard();
     } catch { toast.error('Erro ao criar demanda'); }
   };
@@ -274,7 +249,11 @@ export default function DemandsPage() {
                 </span>
               )}
             </button>
-            <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+            <button onClick={() => {
+              setForm({ title: '', description: '', priority: 'medium', demand_type: '', client_id: '', assigned_to_id: '', sla_hours: '', due_date: '', column_id: '' });
+              setModalTitle('Nova Demanda');
+              setShowModal(true);
+            }} className="btn-primary flex items-center gap-2">
               <Plus className="h-4 w-4" /> Nova Demanda
             </button>
           </div>
@@ -364,9 +343,13 @@ export default function DemandsPage() {
                         {colDemands.length}
                       </span>
                       <button
-                        onClick={() => { setQuickAddColumn(column.id); setQuickAddTitle(''); }}
+                        onClick={() => {
+                          setForm({ title: '', description: '', priority: 'medium', demand_type: '', client_id: '', assigned_to_id: '', sla_hours: '', due_date: '', column_id: String(column.id) });
+                          setModalTitle(`Nova Demanda — ${column.name}`);
+                          setShowModal(true);
+                        }}
                         className="w-6 h-6 flex items-center justify-center rounded-full bg-white dark:bg-dark-700 hover:bg-primary-300 hover:text-dark-900 text-gray-400 transition-colors text-sm font-bold"
-                        title="Adicionar demanda rápida"
+                        title="Adicionar demanda"
                       >
                         +
                       </button>
@@ -374,28 +357,6 @@ export default function DemandsPage() {
                   </div>
 
                   <div className="space-y-3 min-h-[200px]">
-                    {/* Quick add inline */}
-                    {quickAddColumn === column.id && (
-                      <div className="bg-white dark:bg-dark-700 rounded-lg p-3 shadow-sm border-2 border-primary-300">
-                        <input
-                          ref={quickAddRef}
-                          type="text"
-                          value={quickAddTitle}
-                          onChange={e => setQuickAddTitle(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleQuickAdd(column.id);
-                            if (e.key === 'Escape') { setQuickAddColumn(null); setQuickAddTitle(''); }
-                          }}
-                          onBlur={() => {
-                            if (quickAddTitle.trim()) handleQuickAdd(column.id);
-                            else { setQuickAddColumn(null); setQuickAddTitle(''); }
-                          }}
-                          placeholder="Título da demanda..."
-                          className="w-full text-sm border-none outline-none placeholder-gray-400 bg-transparent dark:text-gray-100"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">Enter para criar · Esc para cancelar</p>
-                      </div>
-                    )}
 
                     {colDemands.map((demand) => {
                       const deadline = demand.due_date ? formatDeadline(demand.due_date) : null;
@@ -551,7 +512,7 @@ export default function DemandsPage() {
           </form>
         </Modal>
 
-        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Nova Demanda" size="lg">
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={modalTitle} size="lg">
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Título *</label>
@@ -595,7 +556,14 @@ export default function DemandsPage() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Coluna</label>
+                <select className="input-field" value={form.column_id} onChange={e => setForm({...form, column_id: e.target.value})}>
+                  <option value="">Padrão</option>
+                  {columns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1">SLA (horas)</label>
                 <input type="number" className="input-field" value={form.sla_hours} onChange={e => setForm({...form, sla_hours: e.target.value})} placeholder="Ex: 48" />

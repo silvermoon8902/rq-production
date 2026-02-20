@@ -498,12 +498,37 @@ export default function FinancialPage() {
             </h1>
             <p className="text-gray-500 mt-1">{MONTHS[month - 1]} {year}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex bg-gray-100 dark:bg-dark-800 rounded-lg p-1 gap-1">
+              <button
+                onClick={() => { setMonth(now.getMonth() + 1); setYear(now.getFullYear()); }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  month === now.getMonth() + 1 && year === now.getFullYear()
+                    ? 'bg-primary-300 text-dark-900'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                }`}
+              >
+                Este mês
+              </button>
+              <button
+                onClick={() => {
+                  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  setMonth(prev.getMonth() + 1); setYear(prev.getFullYear());
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  (() => { const p = new Date(now.getFullYear(), now.getMonth() - 1, 1); return month === p.getMonth() + 1 && year === p.getFullYear(); })()
+                    ? 'bg-primary-300 text-dark-900'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                }`}
+              >
+                Mês passado
+              </button>
+            </div>
             <select className="input-field w-full sm:w-40" value={month} onChange={e => setMonth(Number(e.target.value))}>
               {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
             <select className="input-field w-full sm:w-28" value={year} onChange={e => setYear(Number(e.target.value))}>
-              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              {[2023, 2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>

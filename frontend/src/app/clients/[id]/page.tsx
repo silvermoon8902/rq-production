@@ -5,10 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import AuthGuard from '@/components/layout/AuthGuard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
-import { clientsApi, teamApi, demandsApi } from '@/services/api';
+import { clientsApi, teamApi, demandsApi, meetingsApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
-import { ClientDetail, TeamMember, Demand } from '@/types';
+import { ClientDetail, TeamMember, Demand, ClientMeeting } from '@/types';
 import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil, MessageSquare, Layers } from 'lucide-react';
 import DemandPreviewModal from '@/components/ui/DemandPreviewModal';
 import toast from 'react-hot-toast';
@@ -29,7 +29,11 @@ export default function ClientDetailPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'info' | 'team' | 'demands'>('info');
+  const [tab, setTab] = useState<'info' | 'team' | 'demands' | 'meetings'>('info');
+  const [meetings, setMeetings] = useState<ClientMeeting[]>([]);
+  const [meetingsLoaded, setMeetingsLoaded] = useState(false);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [meetingTypeFilter, setMeetingTypeFilter] = useState<'all' | 'daily' | 'one_a_one'>('all');
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [allocForm, setAllocForm] = useState({ member_id: '', monthly_value: '', start_date: '' });
   const [showEditModal, setShowEditModal] = useState(false);
@@ -87,6 +91,17 @@ export default function ClientDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMeetings = async () => {
+    if (meetingsLoaded) return;
+    setMeetingsLoading(true);
+    try {
+      const res = await meetingsApi.getAll({ client_id: clientId });
+      setMeetings(res.data);
+      setMeetingsLoaded(true);
+    } catch { toast.error('Erro ao carregar reuniões'); }
+    finally { setMeetingsLoading(false); }
   };
 
   const handleDeleteAllocation = async (allocId: number) => {
@@ -312,16 +327,24 @@ export default function ClientDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b mb-6">
-          {(['info', 'team', 'demands'] as const).map(t => (
+        <div className="flex gap-1 border-b mb-6 overflow-x-auto">
+          {([
+            { key: 'info', label: 'Informações' },
+            { key: 'team', label: `Equipe (${client.allocations.length})` },
+            { key: 'demands', label: `Demandas (${demands.length})` },
+            { key: 'meetings', label: 'Reuniões' },
+          ] as { key: typeof tab; label: string }[]).map(t => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === t ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              key={t.key}
+              onClick={() => {
+                setTab(t.key);
+                if (t.key === 'meetings') loadMeetings();
+              }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                tab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'info' ? 'Informações' : t === 'team' ? `Equipe (${client.allocations.length})` : `Demandas (${demands.length})`}
+              {t.label}
             </button>
           ))}
         </div>
@@ -593,6 +616,84 @@ export default function ClientDetailPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab: Reuniões */}
+        {tab === 'meetings' && (
+          <div>
+            {/* Sub-filter */}
+            <div className="flex gap-2 mb-4">
+              {(['all', 'daily', 'one_a_one'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setMeetingTypeFilter(t)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    meetingTypeFilter === t
+                      ? 'bg-primary-300 text-dark-900'
+                      : 'bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                  }`}
+                >
+                  {t === 'all' ? 'Todos' : t === 'daily' ? 'Daily' : '1:1'}
+                </button>
+              ))}
+            </div>
+
+            {meetingsLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+              </div>
+            ) : (() => {
+              const filtered = meetings.filter(m =>
+                meetingTypeFilter === 'all' || m.meeting_type === meetingTypeFilter
+              );
+              if (filtered.length === 0) {
+                return (
+                  <p className="text-center py-12 text-gray-400">
+                    Nenhuma reunião registrada
+                  </p>
+                );
+              }
+              return (
+                <div className="space-y-3">
+                  {filtered.map(m => (
+                    <div key={m.id} className="card p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              m.meeting_type === 'daily'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              {m.meeting_type === 'daily' ? 'Daily' : '1:1'}
+                            </span>
+                            {m.member_name && (
+                              <span className="text-sm text-gray-600">{m.member_name}</span>
+                            )}
+                          </div>
+                          {m.notes && (
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap">{m.notes}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm text-gray-500">
+                            {new Date(m.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </p>
+                          {m.health_score != null && (
+                            <p className={`text-sm font-bold mt-0.5 ${
+                              m.health_score >= 8 ? 'text-green-600' : m.health_score >= 5 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              HS: {m.health_score}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 
