@@ -51,21 +51,6 @@ async def lifespan(app: FastAPI):
         for stmt in migrations:
             await conn.execute(text(stmt))
 
-    # Seed design module permissions (ORM-based to avoid asyncpg enum issues)
-    async with AsyncSessionLocal() as session:
-        for role_str in ["admin", "gerente", "colaborador"]:
-            result = await session.execute(
-                text("SELECT 1 FROM module_permissions WHERE role::text = :role AND module = 'design'"),
-                {"role": role_str},
-            )
-            if not result.scalar():
-                perm = ModulePermission(
-                    role=role_str, module="design",
-                    can_read=True, can_write=True,
-                )
-                session.add(perm)
-        await session.commit()
-
     # Seed default kanban columns
     from app.modules.demands.services import seed_default_columns
     from app.modules.design.services import seed_default_design_columns
@@ -132,6 +117,20 @@ async def lifespan(app: FastAPI):
                     can_read=can_read, can_write=can_write,
                 ))
             await session.commit()
+
+    # Seed design module permissions for existing DBs (ORM to avoid asyncpg enum issues)
+    async with AsyncSessionLocal() as session:
+        for role_str in ["admin", "gerente", "colaborador"]:
+            result = await session.execute(
+                text("SELECT 1 FROM module_permissions WHERE role::text = :role AND module = 'design'"),
+                {"role": role_str},
+            )
+            if not result.scalar():
+                session.add(ModulePermission(
+                    role=role_str, module="design",
+                    can_read=True, can_write=True,
+                ))
+        await session.commit()
 
     yield
 
