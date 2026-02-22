@@ -5,11 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import AuthGuard from '@/components/layout/AuthGuard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
-import { clientsApi, teamApi, demandsApi, meetingsApi } from '@/services/api';
+import { clientsApi, teamApi, demandsApi, meetingsApi, designApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useFinanceVisibilityStore } from '@/stores/financeVisibilityStore';
 import { ClientDetail, TeamMember, Demand, ClientMeeting } from '@/types';
-import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil, MessageSquare, Layers } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Kanban, Trash2, Plus, DollarSign, Calendar, Globe, AtSign, Heart, Pencil, MessageSquare, Layers, Image, Video, Paperclip } from 'lucide-react';
 import DemandPreviewModal from '@/components/ui/DemandPreviewModal';
 import toast from 'react-hot-toast';
 
@@ -29,7 +29,9 @@ export default function ClientDetailPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'info' | 'team' | 'demands' | 'meetings'>('info');
+  const [tab, setTab] = useState<'info' | 'team' | 'demands' | 'meetings' | 'artes'>('info');
+  const [gallery, setGallery] = useState<any[]>([]);
+  const [galleryLoaded, setGalleryLoaded] = useState(false);
   const [meetings, setMeetings] = useState<ClientMeeting[]>([]);
   const [meetingsLoaded, setMeetingsLoaded] = useState(false);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
@@ -103,6 +105,18 @@ export default function ClientDetailPage() {
     } catch { toast.error('Erro ao carregar reuniões'); }
     finally { setMeetingsLoading(false); }
   };
+
+  const loadGallery = async () => {
+    if (galleryLoaded) return;
+    try {
+      const res = await designApi.getClientGallery(clientId);
+      setGallery(res.data);
+      setGalleryLoaded(true);
+    } catch { /* ignore */ }
+  };
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+  const getFileUrl = (attId: number) => `${API_URL}/design/attachments/${attId}/file`;
 
   const handleDeleteAllocation = async (allocId: number) => {
     if (!confirm('Remover alocação?')) return;
@@ -333,12 +347,14 @@ export default function ClientDetailPage() {
             { key: 'team', label: `Equipe (${client.allocations.length})` },
             { key: 'demands', label: `Demandas (${demands.length})` },
             { key: 'meetings', label: 'Reuniões' },
+            { key: 'artes', label: 'Artes' },
           ] as { key: typeof tab; label: string }[]).map(t => (
             <button
               key={t.key}
               onClick={() => {
                 setTab(t.key);
                 if (t.key === 'meetings') loadMeetings();
+                if (t.key === 'artes') loadGallery();
               }}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -694,6 +710,66 @@ export default function ClientDetailPage() {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* Tab: Artes */}
+        {tab === 'artes' && (
+          <div>
+            {gallery.length === 0 ? (
+              <p className="text-center py-12 text-gray-400">Nenhuma arte aprovada para este cliente</p>
+            ) : (
+              <div className="space-y-6">
+                {gallery.map((item: any) => (
+                  <div key={item.demand_id} className="card">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {item.demand_type === 'video' ? (
+                          <Video className="h-4 w-4 text-purple-500" />
+                        ) : (
+                          <Image className="h-4 w-4 text-blue-500" />
+                        )}
+                        <h3 className="font-semibold text-sm">{item.title}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          item.demand_type === 'video' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {item.demand_type === 'video' ? 'Vídeo' : 'Arte'}
+                        </span>
+                      </div>
+                      {item.approved_at && (
+                        <span className="text-xs text-gray-500">
+                          {new Date(item.approved_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {item.attachments.map((att: any) => (
+                        <a
+                          key={att.id}
+                          href={getFileUrl(att.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block group"
+                        >
+                          {att.file_type?.startsWith('image/') ? (
+                            <img
+                              src={getFileUrl(att.id)}
+                              alt={att.filename}
+                              className="w-full h-32 object-cover rounded-lg border border-dark-600 group-hover:border-primary-400 transition-colors"
+                            />
+                          ) : (
+                            <div className="w-full h-32 flex flex-col items-center justify-center bg-dark-700 rounded-lg border border-dark-600 group-hover:border-primary-400 transition-colors">
+                              {att.file_type?.startsWith('video/') ? <Video className="h-8 w-8 text-purple-400" /> : <Paperclip className="h-8 w-8 text-gray-400" />}
+                              <span className="text-xs text-gray-500 mt-1">{att.filename}</span>
+                            </div>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

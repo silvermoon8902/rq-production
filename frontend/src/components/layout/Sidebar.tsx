@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Palette,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Clientes', href: '/clients', icon: Building2, module: 'clients' },
   { name: 'Equipe', href: '/team', icon: UserCog, module: 'team' },
   { name: 'Demandas', href: '/demands', icon: Kanban, module: 'demands' },
+  { name: 'Design', href: '/design', icon: Palette, module: 'design' },
   { name: 'Daily / 1:1', href: '/daily', icon: CalendarCheck, module: 'daily' },
   { name: 'Financeiro', href: '/financial', icon: DollarSign, module: 'financial' },
   { name: 'Usuários', href: '/users', icon: ShieldCheck, module: 'users' },

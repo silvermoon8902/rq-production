@@ -11,6 +11,7 @@ from app.modules.demands.routes import router as demands_router
 from app.modules.financial.routes import router as financial_router
 from app.shared.dashboard import router as dashboard_router
 from app.modules.meetings.routes import router as meetings_router
+from app.modules.design.routes import router as design_router
 
 # Import all models so they're registered with Base
 from app.modules.auth.models import User, ModulePermission  # noqa
@@ -19,6 +20,10 @@ from app.modules.team.models import Squad, TeamMember, TeamAllocation, MemberSqu
 from app.modules.demands.models import Demand, KanbanColumn, DemandHistory, DemandComment  # noqa
 from app.modules.meetings.models import ClientMeeting  # noqa
 from app.modules.financial.models import MonthlyFinancials, ExtraExpense  # noqa
+from app.modules.design.models import (  # noqa
+    DesignColumn, DesignDemand, DesignAttachment, DesignComment as DesignCommentModel,
+    DesignHistory, DesignPayment,
+)
 
 settings = get_settings()
 
@@ -42,15 +47,23 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS health_score FLOAT",
             # Enable financial read for non-admins (personal view)
             "UPDATE module_permissions SET can_read = true WHERE module = 'financial' AND role::text IN ('gerente', 'colaborador')",
+            # Seed design module permissions if missing
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'admin', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='admin' AND module='design')",
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'gerente', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='gerente' AND module='design')",
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'colaborador', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='colaborador' AND module='design')",
         ]
         for stmt in migrations:
             await conn.execute(text(stmt))
 
     # Seed default kanban columns
     from app.modules.demands.services import seed_default_columns
+    from app.modules.design.services import seed_default_design_columns
 
     async with AsyncSessionLocal() as session:
         await seed_default_columns(session)
+
+    async with AsyncSessionLocal() as session:
+        await seed_default_design_columns(session)
 
     # Seed default admin user
     from app.modules.auth.models import User, UserRole, ModulePermission
@@ -95,6 +108,9 @@ async def lifespan(app: FastAPI):
         ("admin",        "users",      True,  True),
         ("gerente",      "users",      False, False),
         ("colaborador",  "users",      False, False),
+        ("admin",        "design",     True,  True),
+        ("gerente",      "design",     True,  True),
+        ("colaborador",  "design",     True,  True),
     ]
     async with AsyncSessionLocal() as session:
         existing = await session.execute(select(ModulePermission))
@@ -136,6 +152,7 @@ app.include_router(demands_router, prefix=API_PREFIX)
 app.include_router(financial_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(meetings_router, prefix=API_PREFIX)
+app.include_router(design_router, prefix=API_PREFIX)
 
 
 @app.get("/")

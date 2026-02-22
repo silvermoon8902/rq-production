@@ -209,3 +209,81 @@ export interface AllocationCost {
   active_days: number;
   proportional_value: number;
 }
+
+// === Design ===
+export interface DesignColumn {
+  id: number;
+  name: string;
+  order: number;
+  color: string;
+  is_default: boolean;
+  demands_count: number;
+}
+
+export interface DesignDemand {
+  id: number;
+  title: string;
+  description: string | null;
+  demand_type: 'arte' | 'video';
+  column_id: number | null;
+  column_name: string | null;
+  position: number;
+  client_id: number | null;
+  client_name: string | null;
+  assigned_to_id: number | null;
+  assigned_to_name: string | null;
+  created_by_id: number | null;
+  due_date: string | null;
+  completed_at: string | null;
+  approved_at: string | null;
+  payment_value: number | null;
+  payment_registered: boolean;
+  attachments_count: number;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesignAttachment {
+  id: number;
+  demand_id: number;
+  filename: string;
+  file_path: string;
+  file_type: string | null;
+  file_size: number;
+  uploaded_by_id: number | null;
+  created_at: string;
+}
+
+export interface DesignComment {
+  id: number;
+  demand_id: number;
+  user_id: number | null;
+  text: string;
+  created_at: string;
+  user_name: string | null;
+}
+
+export interface DesignPayment {
+  id: number;
+  demand_id: number;
+  member_id: number;
+  client_id: number | null;
+  demand_type: string;
+  value: number;
+  month: number;
+  year: number;
+  created_at: string;
+  member_name: string | null;
+  client_name: string | null;
+  demand_title: string | null;
+}
+
+export interface DesignPaymentSummary {
+  member_id: number;
+  member_name: string;
+  total_artes: number;
+  total_videos: number;
+  total_value: number;
+  payments: DesignPayment[];
+}

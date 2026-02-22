@@ -146,4 +146,38 @@ export const financialApi = {
     api.get(`/financial/clients/${clientId}`, { params }),
 };
 
+// Design
+export const designApi = {
+  getBoard: (params?: any) => api.get('/design/board', { params }),
+  getColumns: () => api.get('/design/columns'),
+  createColumn: (data: any) => api.post('/design/columns', data),
+  updateColumn: (id: number, data: any) => api.patch(`/design/columns/${id}`, data),
+  deleteColumn: (id: number) => api.delete(`/design/columns/${id}`),
+  getAll: (params?: any) => api.get('/design/demands', { params }),
+  getById: (id: number) => api.get(`/design/demands/${id}`),
+  create: (data: any) => api.post('/design/demands', data),
+  update: (id: number, data: any) => api.patch(`/design/demands/${id}`, data),
+  move: (id: number, data: any) => api.post(`/design/demands/${id}/move`, data),
+  approve: (id: number) => api.post(`/design/demands/${id}/approve`),
+  delete: (id: number) => api.delete(`/design/demands/${id}`),
+  getComments: (id: number) => api.get(`/design/demands/${id}/comments`),
+  addComment: (id: number, data: { text: string }) => api.post(`/design/demands/${id}/comments`, data),
+  getAttachments: (id: number) => api.get(`/design/demands/${id}/attachments`),
+  uploadAttachment: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/design/demands/${id}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteAttachment: (id: number) => api.delete(`/design/attachments/${id}`),
+  getAttachmentUrl: (id: number) => `${API_URL}/design/attachments/${id}/file`,
+  getHistory: (id: number) => api.get(`/design/demands/${id}/history`),
+  getPayments: (month: number, year: number, memberId?: number) =>
+    api.get('/design/payments', { params: { month, year, member_id: memberId } }),
+  getPaymentSummary: (month: number, year: number) =>
+    api.get('/design/payments/summary', { params: { month, year } }),
+  getClientGallery: (clientId: number) => api.get(`/design/gallery/${clientId}`),
+};
+
 export default api;
