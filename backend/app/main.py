@@ -118,14 +118,16 @@ async def lifespan(app: FastAPI):
                 ))
             await session.commit()
 
-    # Seed design module permissions for existing DBs (ORM to avoid asyncpg enum issues)
+    # Seed design module permissions for existing DBs (ORM-based check + insert)
     async with AsyncSessionLocal() as session:
         for role_str in ["admin", "gerente", "colaborador"]:
-            result = await session.execute(
-                text("SELECT 1 FROM module_permissions WHERE role::text = :role AND module = 'design'"),
-                {"role": role_str},
+            existing = await session.execute(
+                select(ModulePermission).where(
+                    ModulePermission.module == "design",
+                    ModulePermission.role == role_str,
+                )
             )
-            if not result.scalar():
+            if not existing.scalar_one_or_none():
                 session.add(ModulePermission(
                     role=role_str, module="design",
                     can_read=True, can_write=True,
