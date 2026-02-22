@@ -176,3 +176,23 @@ class DesignPayment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class DesignMemberRate(Base):
+    __tablename__ = "design_member_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    member_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("team_members.id", ondelete="CASCADE"), unique=True
+    )
+    arte_value: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("10.00")
+    )
+    video_value: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("20.00")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

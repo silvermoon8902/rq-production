@@ -22,7 +22,7 @@ from app.modules.meetings.models import ClientMeeting  # noqa
 from app.modules.financial.models import MonthlyFinancials, ExtraExpense  # noqa
 from app.modules.design.models import (  # noqa
     DesignColumn, DesignDemand, DesignAttachment, DesignComment as DesignCommentModel,
-    DesignHistory, DesignPayment,
+    DesignHistory, DesignPayment, DesignMemberRate,
 )
 
 settings = get_settings()

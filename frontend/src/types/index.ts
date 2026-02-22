@@ -285,5 +285,14 @@ export interface DesignPaymentSummary {
   total_artes: number;
   total_videos: number;
   total_value: number;
+  arte_rate: number;
+  video_rate: number;
   payments: DesignPayment[];
+}
+
+export interface DesignMemberRate {
+  member_id: number;
+  member_name: string;
+  arte_value: number;
+  video_value: number;
 }

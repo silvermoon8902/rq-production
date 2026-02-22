@@ -178,6 +178,9 @@ export const designApi = {
   getPaymentSummary: (month: number, year: number) =>
     api.get('/design/payments/summary', { params: { month, year } }),
   getClientGallery: (clientId: number) => api.get(`/design/gallery/${clientId}`),
+  getRates: () => api.get('/design/rates'),
+  updateRate: (data: { member_id: number; arte_value: number; video_value: number }) =>
+    api.put('/design/rates', data),
 };
 
 export default api;

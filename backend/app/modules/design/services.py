@@ -8,7 +8,7 @@ from fastapi import HTTPException, UploadFile
 
 from app.modules.design.models import (
     DesignColumn, DesignDemand, DesignAttachment, DesignComment,
-    DesignHistory, DesignPayment, DesignDemandType,
+    DesignHistory, DesignPayment, DesignDemandType, DesignMemberRate,
 )
 from app.modules.design.schemas import (
     DesignColumnCreate, DesignColumnUpdate,
@@ -27,10 +27,8 @@ ALLOWED_TYPES = {
     "application/pdf",
 }
 
-PAYMENT_VALUES = {
-    "arte": Decimal("10.00"),
-    "video": Decimal("20.00"),
-}
+DEFAULT_ARTE_VALUE = Decimal("10.00")
+DEFAULT_VIDEO_VALUE = Decimal("20.00")
 
 
 # ========== Columns ==========
@@ -236,7 +234,7 @@ async def approve_demand(db: AsyncSession, demand_id: int, user_id: int) -> dict
 
     now = datetime.now(timezone.utc)
     demand_type_str = demand.demand_type.value if hasattr(demand.demand_type, 'value') else str(demand.demand_type)
-    value = PAYMENT_VALUES.get(demand_type_str, Decimal("10.00"))
+    value = await _get_member_rate(db, demand.assigned_to_id, demand_type_str)
 
     demand.approved_at = now
     demand.completed_at = demand.completed_at or now
@@ -453,16 +451,24 @@ async def get_payment_summary(
 ) -> list[dict]:
     """Aggregate payments by member for a given month."""
     payments = await get_payments(db, month, year)
+
+    # Load configured rates
+    rates_result = await db.execute(select(DesignMemberRate))
+    rates_map = {r.member_id: r for r in rates_result.scalars().all()}
+
     members: dict[int, dict] = {}
     for p in payments:
         mid = p["member_id"]
         if mid not in members:
+            rate = rates_map.get(mid)
             members[mid] = {
                 "member_id": mid,
                 "member_name": p["member_name"],
                 "total_artes": 0,
                 "total_videos": 0,
                 "total_value": Decimal("0"),
+                "arte_rate": rate.arte_value if rate else DEFAULT_ARTE_VALUE,
+                "video_rate": rate.video_value if rate else DEFAULT_VIDEO_VALUE,
                 "payments": [],
             }
         if p["demand_type"] == "arte":
@@ -472,6 +478,69 @@ async def get_payment_summary(
         members[mid]["total_value"] += p["value"]
         members[mid]["payments"].append(p)
     return list(members.values())
+
+
+# ========== Member Rates ==========
+
+async def _get_member_rate(db: AsyncSession, member_id: int, demand_type: str) -> Decimal:
+    """Look up per-member rate, fall back to global defaults."""
+    result = await db.execute(
+        select(DesignMemberRate).where(DesignMemberRate.member_id == member_id)
+    )
+    rate = result.scalar_one_or_none()
+    if rate:
+        return rate.arte_value if demand_type == "arte" else rate.video_value
+    return DEFAULT_ARTE_VALUE if demand_type == "arte" else DEFAULT_VIDEO_VALUE
+
+
+async def get_all_rates(db: AsyncSession) -> list[dict]:
+    """Return rates for all active team members."""
+    result = await db.execute(
+        select(TeamMember).where(TeamMember.status == "active").order_by(TeamMember.name)
+    )
+    members = result.scalars().all()
+    rates_result = await db.execute(select(DesignMemberRate))
+    rates_map = {r.member_id: r for r in rates_result.scalars().all()}
+    output = []
+    for m in members:
+        rate = rates_map.get(m.id)
+        output.append({
+            "member_id": m.id,
+            "member_name": m.name,
+            "arte_value": rate.arte_value if rate else DEFAULT_ARTE_VALUE,
+            "video_value": rate.video_value if rate else DEFAULT_VIDEO_VALUE,
+        })
+    return output
+
+
+async def upsert_rate(
+    db: AsyncSession, member_id: int, arte_value: Decimal, video_value: Decimal
+) -> dict:
+    """Create or update a member's design rate."""
+    result = await db.execute(
+        select(DesignMemberRate).where(DesignMemberRate.member_id == member_id)
+    )
+    rate = result.scalar_one_or_none()
+    if rate:
+        rate.arte_value = arte_value
+        rate.video_value = video_value
+    else:
+        rate = DesignMemberRate(
+            member_id=member_id,
+            arte_value=arte_value,
+            video_value=video_value,
+        )
+        db.add(rate)
+    await db.commit()
+    await db.refresh(rate)
+    r = await db.execute(select(TeamMember.name).where(TeamMember.id == member_id))
+    member_name = r.scalar_one_or_none() or "Desconhecido"
+    return {
+        "member_id": member_id,
+        "member_name": member_name,
+        "arte_value": rate.arte_value,
+        "video_value": rate.video_value,
+    }
 
 
 # ========== Client Gallery ==========

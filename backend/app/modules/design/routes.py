@@ -239,6 +239,22 @@ async def payment_summary(
 ):
     return await services.get_payment_summary(db, month, year)
 
+@router.get("/rates", response_model=list[schemas.DesignMemberRateResponse])
+async def list_rates(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "gerente")),
+):
+    return await services.get_all_rates(db)
+
+
+@router.put("/rates", response_model=schemas.DesignMemberRateResponse)
+async def update_rate(
+    data: schemas.DesignMemberRateUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    return await services.upsert_rate(db, data.member_id, data.arte_value, data.video_value)
+
 
 # === Client Gallery ===
 @router.get("/gallery/{client_id}")

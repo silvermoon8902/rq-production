@@ -146,4 +146,20 @@ class DesignPaymentSummary(BaseModel):
     total_artes: int
     total_videos: int
     total_value: Decimal
+    arte_rate: Decimal = Decimal("10.00")
+    video_rate: Decimal = Decimal("20.00")
     payments: list[DesignPaymentResponse]
+
+
+class DesignMemberRateResponse(BaseModel):
+    member_id: int
+    member_name: str
+    arte_value: Decimal
+    video_value: Decimal
+    model_config = {"from_attributes": True}
+
+
+class DesignMemberRateUpdate(BaseModel):
+    member_id: int
+    arte_value: Decimal
+    video_value: Decimal
