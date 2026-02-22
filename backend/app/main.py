@@ -47,13 +47,24 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS health_score FLOAT",
             # Enable financial read for non-admins (personal view)
             "UPDATE module_permissions SET can_read = true WHERE module = 'financial' AND role::text IN ('gerente', 'colaborador')",
-            # Seed design module permissions if missing
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'admin'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='admin' AND module='design')",
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'gerente'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='gerente' AND module='design')",
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'colaborador'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='colaborador' AND module='design')",
         ]
         for stmt in migrations:
             await conn.execute(text(stmt))
+
+    # Seed design module permissions (ORM-based to avoid asyncpg enum issues)
+    async with AsyncSessionLocal() as session:
+        for role_str in ["admin", "gerente", "colaborador"]:
+            result = await session.execute(
+                text("SELECT 1 FROM module_permissions WHERE role::text = :role AND module = 'design'"),
+                {"role": role_str},
+            )
+            if not result.scalar():
+                perm = ModulePermission(
+                    role=role_str, module="design",
+                    can_read=True, can_write=True,
+                )
+                session.add(perm)
+        await session.commit()
 
     # Seed default kanban columns
     from app.modules.demands.services import seed_default_columns
