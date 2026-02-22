@@ -48,9 +48,9 @@ async def lifespan(app: FastAPI):
             # Enable financial read for non-admins (personal view)
             "UPDATE module_permissions SET can_read = true WHERE module = 'financial' AND role::text IN ('gerente', 'colaborador')",
             # Seed design module permissions if missing
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'admin', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='admin' AND module='design')",
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'gerente', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='gerente' AND module='design')",
-            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'colaborador', 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='colaborador' AND module='design')",
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'admin'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='admin' AND module='design')",
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'gerente'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='gerente' AND module='design')",
+            "INSERT INTO module_permissions (role, module, can_read, can_write) SELECT 'colaborador'::userrole, 'design', true, true WHERE NOT EXISTS (SELECT 1 FROM module_permissions WHERE role::text='colaborador' AND module='design')",
         ]
         for stmt in migrations:
             await conn.execute(text(stmt))
